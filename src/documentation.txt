@@ -1,0 +1,315 @@
+
+
+// Functions are defined by the fn keyword and then an identifier followed by parenthesis and then a code block
+fn test() {
+}
+
+// Parameters are designated by using a comma separated list
+fn test2(parm1, param2) {
+
+}
+
+// Functions implicity return their last expression unless it is a mutable assign, then the function returns an empty tuple
+// Return type can be indicated with an arrow (->) and then a Type
+// Types for parameters can indicated with a colon (:) and then the type
+fn test3(x : int, y : int) -> int {
+
+}
+
+fn proc() {
+    4
+}
+is the same as:
+fn proc() {
+    return 4
+}
+
+
+// While this is a dynamic language, types will be checked at runtime if specifed
+fn add(x : int, y : int) -> int {
+    return x + y;
+}
+is the same as:
+fn add(x, y) {
+    if x typeis int && y typeis int {
+        return x + y;
+    }
+}
+
+
+
+// Functions have this type:
+f(int, int) -> int
+f() -> None
+
+
+
+// Type classes can be declared in the folowing way
+// with the name of the typeclass, then the type that represents the typeclass
+class Monad m {
+    fn (>>=)(m a, f(a) -> m b) -> m b
+    fn (>>)(m a) -> m b
+    fn pure(a) -> m a
+}
+
+//There can be parent typeclasses to have heirarchy
+class (Applicative a) => Monad m {
+    fn (>>=)(m a, f(a) -> m b) -> m b
+    fn (>>)(m a) -> m b
+    fn pure(a) -> m a
+}
+
+// Type classes can be implemented in the following way
+instance Monad (Maybe a) {
+    fn (>>=)(monad : Maybe a, transform : f(Maybe a) -> Maybe b) -> Maybe b {
+        match monad {
+            None -> None,
+            Just a -> transform(a),
+        }
+    }
+    fn (>>)(monad : Maybe a) -> Maybe b {
+        match monad {
+            None -> None,
+            Just a -> Just(a),
+        }
+    }
+    fn pure(value : a) -> Maybe a {
+        Just(a);
+    }
+}
+
+// To use the array index operator ([]), the access typeclass has to be implemented
+class Access {
+    fn (get[])(struct, index)
+    fn (set[])(struct, index, value)
+}
+instance Access (Hashmap a b) {
+    fn (get[])(map : Hashmap a b, index : a) -> b {
+        map.get(a)
+    }
+    fn (set[])(map : Hashmap a b, index : a, value b) -> () {
+        map.set(a, b);
+    }
+}
+
+// By default, everything is pass by value, however we can specify that we wish to use a reference by adding a ampersand (&) to the type
+fn mutate_add(x : &int) {
+    x := x + 1;
+}
+
+// To declare a product type (Rust-Style Struct)
+data product Card {
+    value,
+    suit
+}
+// To do so with types
+data product Card a {
+    value : CardValue,
+    suit : Suit,
+    company : a
+}
+
+// To declare a sum type (Rust-Style Enum)
+data sum Suit {
+    Club,
+    Diamond,
+    Heart,
+    Spade,
+}
+// To have a product type in a sum type
+// you declare a tuple
+data sum Maybe a {
+    Just(a),
+    None
+}
+
+
+
+Built in Operators
+assignment: =               : By default all variables are immutable for safety, these cannot be passed by reference in for safety (Under the hood they are passed by ref but not mutable)
+mutable-assignment: :=      : This operator allows for the creation of mutable variables, these can be passed by reference (Under the hood they are passed by &mut)
+indexing get and set: []    : This operator can be overloaded through a certain Type Class
+empty list : []             : This may or may not be an operator but a function that takes no arguments
+attribute operator: @       : This is used to add attributes to global variables and functions
+period operator .           : This does two different things, one is syntactic sugar for calling functions on varibles/literals with matching first types
+                              The other way is to access individual members on Product Types
+namespace operator ::       : This is borrowed from how Rust does Namespacing. It is how you access functions and globals from other files
+tuple operator ()           : Used for defining and unpacking tuples 
+                            : Also used for scoping things (x + (2 + 2))
+type operator :             : Used for specifying the type of a variable
+                              Also used for specifying the label of a loop (label: loop {...})
+range operator ..           : Used for specifying a range x to y exclusive
+range operator ..=          : Used for specifying a range x to y inclusive
+
+
+Keywords:
+class           : The way you declare a type class
+instance        : The way you implement a type class
+default         : Used with instance to declare a default implementation for a type class
+data            : The way you declare a sum or product type
+sum             : Used with data to declare a sum type
+product         : Used with data to declare a product type
+type            : Used to declare a type alias
+match           : Used for patern match statement
+fn              : Used to declare a function as well as a lambda
+typeis          : Used to check a type of a variable
+for             : For Loop. Uses iterator
+in              : Used with for loop to access value
+while           : While Loop
+loop            : Generic loop, used for infinte loops
+if              : If statement
+else            : Else statement
+continue        : Continue statement
+break           : Break statement
+break <label>   : Break loop with label
+
+
+Built-in Attributes:
+Op-Ord(tier)                : Operator Order -- Takes in a number to decide when it should evaluate an infix function
+Atomic                      : Makes a Number Atomic and available to all threads
+Thread-Local                : Makes a Global local to a thread, This is the default behavior of globals
+Thread-Shared               : Makes a Global available to all threads But not mutable to all threads
+Thread-Mutable              : Makes a Global available and Mutable to all threads, It is protected with a Mutex
+Thread-Spawn                : Makes a function get spawned in a new thread 
+Derive(Typeclass, ...)      : Allows for using the default implementation of the type class on a particular type
+Minimal                     : Used for marking the Minimum Needed Functions to implement a type class before using the default
+Default                     : Used for using the default implementation if not specified, The opposite of Minimal
+
+
+Built-in Types:
+Int         : i64
+UInt        : u64
+Float       : f64
+Char        : characters using utf-8
+Byte        : type that represents a byte
+List        : list  (Likely to implemented as a reversed Rust Vec to allow for fast resizing)
+H-List      : heterogeneous list (Likely implemented as a reversed Rust Vec with no type checking)
+...         : Alias for H-List to be used for variadic functions
+Vector      : immutable list with set length (Likely implemented using slices)
+H-Vector    : heterogeneous immutable list with set length (Likely implemented using slices)
+&           : Mutable reference to variable, only allowed for mutable variables
+Tuples      : Implemented to go up to a certain size and can be accessed by doing tuple.0
+Promise     : Used to represent a return value from a thread that has not yet finished. Locks the thread until the value is returned when accessing
+Functions   :
+
+
+
+Built-in Type Classes:
+// These are type classes that are built into the language to allow for basic functionality (i.e. addition, subtraction, multiplication)
+
+// Collection Defines a way to access a collection
+class Collection c {
+    // For iterating over a collection, basically turns it into a list
+    fn (in)(c) -> [c],
+    // For adding and removing the first element of a collection (Might need to be split into two functions)
+    // The cons operator
+    fn (add:)(c, [c]) -> [c],
+    fn (remove:)(c) -> (c, [c]),
+    // Concatonation Operator
+    fn (++)([c], [c]) -> [c],
+    fn length(c) -> UInt,
+    fn empty(c) -> Bool,
+}
+
+class Access c i v {
+    fn (get[])(c, i) -> v,
+    fn (set[])(&c, i, v) -> (),
+}
+
+// These are needed to perform all the different operations on numbers
+class Number a {
+    @Op-Ord(3)
+    fn (+)(a, a) -> a,
+    @Op-Ord(3)
+    fn (-)(a, a) -> a,
+    @Op-Ord(2)
+    fn (*)(a, a) -> a,
+    @Op-Ord(2)
+    fn (/)(a, a) -> (Maybe a),
+    @Op-Ord(2)
+    fn (//)(a, a) -> (Maybe a),
+    @Op-Ord(2)
+    fn (%)(a, a) -> (Maybe a),
+    @Op-Ord(2) Default
+    fn (mod)(a, a) -> (Maybe a),
+    fn abs(a) -> a,
+    // This is the prefix operator to negate a number
+    fn (negate)(a) -> a,
+    // Returns -1, 0, 1
+    fn sign(a) -> a,
+}
+
+class Eq a {
+    @Minimal
+    fn (==)(a, a) -> Bool,
+    @Default
+    fn (/=)(a, a) -> Bool,
+}
+
+class Eq a => Ord a {
+    @Minimal Default
+    fn compare(a, a) -> Ordering,
+    fn (<)(a, a) -> Bool,
+    fn (<=)(a, a) -> Bool,
+    fn (>)(a, a) -> Bool,
+    fn (>=)(a, a) -> Bool,
+    @Default
+    fn max(a, a) -> a,
+    @Default
+    fn min(a, a) -> a,
+}
+
+class Eq a -> Bits a {
+    // Bitwise and
+    fn (&)(a, a) -> a,
+    // Bitwise or
+    fn (|)(a, a) -> a,
+    // Bitwise xor
+    fn (^)(a, a) -> a,
+    // Bitwise not
+    fn (~)(a) -> a,
+    // Bitwise left shift
+    fn shiftL(a, a) -> a,
+    // Bitwise right shift
+    fn shiftR(a, a) -> a,
+}
+
+class Show a {
+    @Default
+    fn show(a) -> String,
+}
+
+// This defines a way to clean up a type when it goes out of scope
+class Drop a {
+    @Default
+    fn drop(a) -> (),
+}
+
+Built-in Functions:
+// These are functions that are built into the language to allow for basic functionality (i.e. file IO, printing, reading, etc.)
+fn print(String) -> IO ()
+fn println(String) -> IO ()
+fn format(String, ...) -> String
+
+// IO Functions
+// There should be two ways of doing IO, the non functional way and the functional way
+// Therefore there will be two different libraries for IO
+// Non Functional Way of doing IO
+fn open(String, Char) -> File
+fn read(File) -> String
+fn readln(File) -> String
+fn write(File, String) -> ()
+fn writeln(File, String) -> ()
+// Functional Way of doing IO
+fn open(String, Char) -> IO File
+fn read(File, UInt) -> IO String
+fn readln(File) -> IO String
+fn write(File, String) -> IO ()
+fn writeln(File, String) -> IO ()
+
+
+
+Built-in Statements:
+for loop:
+    for var in collection
+
