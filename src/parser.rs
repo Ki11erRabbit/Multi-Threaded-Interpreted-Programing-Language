@@ -426,4 +426,110 @@ mod lexer_tests {
         assert_eq!(tokens, expected, "Keywords were not parsed correctly");
     }
 
+
+    #[test]
+    fn operators_test() {
+        let input = ". = := @ : _";
+
+        let expected = vec![
+            &Token::Period,
+            &Token::Assignment,
+            &Token::MutableAssignment,
+            &Token::Attribute,
+            &Token::Colon,
+            &Token::WildCard,
+        ];
+
+        let result = many_till(alt((operator_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing operators: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing operators");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+
+        assert_eq!(tokens, expected, "Operators were not parsed correctly");
+    }
+
+
+    #[test]
+    fn symbols_test() {
+        let input = "[ ] ( ) { } , ; -> => ::";
+
+        let expected = vec![
+            &Token::BracketLeft,
+            &Token::BracketRight,
+            &Token::ParenLeft,
+            &Token::ParenRight,
+            &Token::CurlyLeft,
+            &Token::CurlyRight,
+            &Token::Comma,
+            &Token::Semicolon,
+            &Token::FunctionReturn,
+            &Token::MatchArm,
+            &Token::Namespace,
+        ];
+
+        let result = many_till(alt((symbol_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing symbols: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing symbols");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+
+        assert_eq!(tokens, expected, "Symbols were not parsed correctly");
+    }
+
+    #[test]
+    fn numbers_test() {
+        let input = "42 3.14 0.1e10 0xAf 0o23 0o101 42i 42U";
+
+        let token1 = Token::Number("42".to_string());
+        let token2 = Token::Number("3.14".to_string());
+        let token3 = Token::Number("0.1e10".to_string());
+        let token4 = Token::Number("0xAf".to_string());
+        let token5 = Token::Number("0o23".to_string());
+        let token6 = Token::Number("0o101".to_string());
+        let token7 = Token::Number("42i".to_string());
+        let token8 = Token::Number("42U".to_string());
+        
+        let expected = vec![
+            &token1,
+            &token2,
+            &token3,
+            &token4,
+            &token5,
+            &token6,
+            &token7,
+            &token8,
+        ];
+
+        let result = many_till(alt((number_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing numbers: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing numbers");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+
+        assert_eq!(tokens, expected, "Numbers were not parsed correctly");
+    }
+
+
+
 }
