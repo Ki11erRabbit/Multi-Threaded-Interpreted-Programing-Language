@@ -6,25 +6,9 @@ MIL?
 
 - All variables are implicitly immutable for safety and cannot be passed by reference.
 - Variables can be declared as mutable and be passed by reference.
+- Modules are loaded in with multiple threads
 
 ### Operators
-
-| Name | Operator | Example | Description | Implementation Notes |
-|------|----------|---------|-------------|----------------------|
-| Assignment | `=` | `x = 2` | Assigns a value to an immutable variable | Under the hood theses will be Rust Immutable References |
-| Mutable Assignment | `:=` | `x := 2` | Assigns a value to a mutable variable | Under the hood these will be Rust Mutable References |
-| Indexing | `[]` | `list[2]` | Allows for accessing a data structure via an index value | Can be redefined with a Certain Type Class |
-| Attribute Operator | `@` | `@Atomic`<br />`x := 2`<br />`Thread-Spawn`<br />`fn calculate(x : Int) -> Int` | Used to add Attributes to global variables and functions. |  |
-| Product Type Access | `.` | `data.member` | Unnecessary With Style function calls<br />Used to access named parts of a product type. | This might get merged into the Koka-Style Function Call |
-| Koka-Style Function Call | `.` | `'a'.toInt()`<br />`map.get("Hello")`<br />`[1,2,3].map() fn (x) {x + 1}`<br /><br />`card.Suit` = `card.Suit()` | If the type of the first parameter of a function matches the type the first value being passed in then it can be called in this way. If the last parameter is a lambda then we can put the lambda outside of the parenthesis.<br />We might also take it one step further and make it so that if a function only takes one argument, we can drop the parenthesis. |  |
-| Namespace | `::` | `functional_io::open("data.csv", 'r')`  | Used for namespaces to prevent name collisions in files. |  |
-| Sum Type Access | `::` | `Maybe::None` | Used to specify the particular Sum Type and its value to prevent name collisions. |  |
-| Tuple Operator | `()` | `()`<br />`(3, 4)` | Used to create a new tuple or unpack one | This might be replaced by a function that takes a `...` or a `H-List` that returns a tuple for constructing one |
-| Exclusive Range | `..` | `1..10` | Used to create an iterable thing that we can convert into a list. |  |
-| Inclusive Range | `..=` | `1..=10` | Used to create an iterable thing that we can convert into a list. |  |
-| Wild Card | `_` | `for _ in 1..10` | Used to match anything in and disregard the value |  |
-| Match Arm | `=>` | `Maybe::None =>` | For use in match statements. |  |
-| Function Return Arrow | `->` | `fn add1(x: Int) -> Int` | For use in functions to indicate return type. | If the return value doesn't match the type, then we crash. |
 
 ### Keywords
 
@@ -101,8 +85,8 @@ These are minimum type classes needed to implement everything else.
 | Functions | Description |
 |-----------|-------------|
 | `fn (in)(c) -> [c]` | For iterating over a collection, at the moment it just gets converted into a list |
-| `fn (add:)(c, [c]) -> [c]` | Cons operator. For adding a single item to the front of a list. |
-| `fn (remove:)([c]) exn -> (c, [c])` | Removes first element of a list and returns a tuple of the first and rest of the list. |
+| `fn (add:)(c, [c]) -> [c]` | Cons operator. For adding a single item to the front of a list. This is the R-Expression version |
+| `fn (remove:)([c]) exn -> (c, [c])` | Removes first element of a list and returns a tuple of the first and rest of the list. This the L-Expression version |
 | `fn (++)([c], [c]) -> [c]` | Concatenation Operator |
 | `fn size(c) -> UInt` | Function to get size of the collection |
 | `@Default`<br />`fn empty(c) -> Bool` | Function to check to see if a collection has any values in it. If `size` is defined then we don't have to implement `empty`. |
@@ -209,7 +193,7 @@ These are the minimal functions are needed to be built into the language.
 | Koka Function Call B | `'a'.toInt`<br />`card.suit` | `<variable>.<identifier>`<br />`<literal>.<identifier>`<br />`<expr>.<identifier>` | Another Koka like function call that drops the parenthesis of a function call if there is only one parameter |
 | Literal | `"string"`<br />`2`<br />`42.0` | `<literal>` | A single literal is also an expression. |
 | Code Block | `{`<br />`    //Some Code here`<br />`}` | `<code block>` | A code block. This will be implemented as a closure to prevent variables from escaping into the function. |
-| Type Is |  |  |  |
+| Type Is | `x typeis String`<br />`x typeis Hash String` | `<var/value> typeis <typeclass> <type>` | Returns True if the var/value matches the type and type class. Type class is optional but will restrict the test. |
 | Effect Handler | `with fn throw-exn(exn) {`<br />`  println(exn.show())`<br />`} {`<br />`    div(3, 0)`<br />`}` | `with <function> <code block>` | The function has to have a matching name and parameters in order to properly handle effects. If the function we are handling has the `Control` attribute then that means that we execute whatever code that comes after the effect handler. Otherwise we call the handler function in the place of the effect function in the code we were just executing. |
 | Lambda Declaration | `fn (x : Int) {`<br />`    x + 1`<br />`}` | `fn (<arg 1>, ...) <code block>` | This is how we make a lambda in our language. |
 
@@ -244,6 +228,7 @@ These are the minimal functions are needed to be built into the language.
 |------|---------|---------|
 | Overloaded index (`[]`) operator | `x = a[2]`<br />`a[2] = x` | `x = a.get(2)`<br />`a.set(2, x)` |
 | Koka Function Call | `x.toInt`<br />`x.toInt()` | `toInt(x)` |
+| Generated Getters and Setters for Product types | `product type Dictionary {`<br />`    table: H-List,`<br />`    size: UInt,`<br />`}`<br />`dictionary.table`<br />`dictionary.table = 3`<br />`dictionary.size` | `dictionary.table()`<br />`dictionary.table(3)`<br />`table(dictionary)`<br />`table(dictionary, 3)` |
 
 #### Example Code
 
@@ -286,6 +271,121 @@ fn main(argv: IO List String) exn -> IO () {
 }
 ```
 
+##### Type Classes
+
+```
+class Access c i {
+    fn (get[])(c, i) -> v,
+    fn (set[])(&c, i, v) -> c,
+}
+```
+
+##### Object Oriented Programming
+
+```
+//Python-like dictionary
+product type Dictionary {
+    table: H-List,
+    size: UInt,
+}
+
+fn ({})() -> Dictionary {
+    Dictionary(H-List(), 0)
+}
+
+fn rehash(&dict) -> Dictionary {
+    new_table := [None];
+    for _ in 0..(dict.table.size() * 2) {
+        new_table := [None]:new_table;
+    }
+    table = dict.data;
+    dict.data = new_table;
+    dict.size = 0;
+    for list in table {
+        match list {
+            None => continue,
+            Just(list) => for (key, value) in list {
+                dict.set(key, value);
+            },
+        }
+    }
+
+    dict
+}
+
+fn get(dict, Hash key) exn {
+    index = hash(key);
+    dict.table[index]
+}
+
+fn set(&dict, Hash key, value) exn {
+    //This is an arbitrary 
+    dict := if map.size / 2 > map.table.size() {
+        dict.rehash()
+    } else {
+        dict
+    };
+    val index = hash(key) % dict.table.size();
+    match dict.table[index] {
+        None => {
+            dict.table[index] = H-List((key, value));
+            dict.size = dict.size + 1
+        },
+        Just(row) => {
+            new_row = row.filter() fn (pair) { key != pair.0 };
+            dict.table[index] = (key, value):new_row;
+            if row.size() < new_row.size() {
+                dict.size = dict.size + 1
+            } else {
+                dict
+            }
+        }
+    }
+}
+
+instance Access c i {
+    fn (get[])(dict: c, key: Hash i) {
+        dict.get(key)
+    }
+    fn (set[])(dict : &c, key :Hash i, value: v) -> Dictionary {
+        dict.set(key, value)
+    }
+}
+
+instance Collection c {
+    fn (in)(dict: c) { 
+        c.table.foldl([]) fn (acc, list) { match list { None => acc, Just(list) => acc ++ list,}
+    }
+    fn (add:)((Hash key, value), dict: c) -> c {
+        dict.[key] = value
+    }
+    fn (remove:)(c) exn -> (v, [c]) {
+        throw("Not Possible for a dictionary.")
+    }
+    fn (++)(dict1, dict2) -> Dictionary {
+        table = dict1.table ++ dict2.table;
+        dict1.table = table;
+        rehash(dict1)
+    }
+    fn size(dict) -> UInt {
+        dict.size
+    }
+    //empty doesn't need to be implemented because we can just infer it from size().
+}
+
+
+
+fn main() {
+    dictionary = {};
+    dictionary["key"] = 22;
+    dictionary["answer"] = 42;
+    dictionary[33] = "a string";
+    println(dictionary)
+}
+```
+
 ## Additional Resources
 
 [https://faculty.cs.byu.edu/~kimball/630/effect-types.html](https://faculty.cs.byu.edu/~kimball/630/effect-types.html)
+
+<https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/>
