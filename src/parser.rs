@@ -530,6 +530,110 @@ mod lexer_tests {
         assert_eq!(tokens, expected, "Numbers were not parsed correctly");
     }
 
+    #[test]
+    fn strings_test() {
+        let input = "\"Hello World\" \"Hello \\\"world\\\"";
+
+        let token1 = Token::String("Hello World".to_string());
+        let token2 = Token::String("Hello \\\"world\\\"".to_string());
+
+        let expected = vec![
+            &token1,
+            &token2,
+        ];
+
+        let result = many_till(alt((string_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing strings: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing strings");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+
+        assert_eq!(tokens, expected, "Strings were not parsed correctly");
+    }
+
+    #[test]
+    fn chars_test() {
+        let input = "'a' '\\n' '\\''";
+
+        let token1 = Token::Char("a".to_string());
+        let token2 = Token::Char("\n".to_string());
+        let token3 = Token::Char("'".to_string());
+
+        let expected = vec![
+            &token1,
+            &token2,
+            &token3,
+        ];
+
+        let result = many_till(alt((char_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing chars: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing chars");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+
+        assert_eq!(tokens, expected, "Chars were not parsed correctly");
+    }
+
+
+    #[test]
+    fn identifiers_test() {
+        let input = "hello world2 _hello &hello .. ..= && >>= get[] con{} add:";
+
+        let token1 = Token::Identifier("hello".to_string());
+        let token2 = Token::Identifier("world2".to_string());
+        let token3 = Token::Identifier("_hello".to_string());
+        let token4 = Token::Identifier("&hello".to_string());
+        let token5 = Token::Identifier("..".to_string());
+        let token6 = Token::Identifier("..=".to_string());
+        let token7 = Token::Identifier("&&".to_string());
+        let token8 = Token::Identifier(">>=".to_string());
+        let token9 = Token::Identifier("get[]".to_string());
+        let token10 = Token::Identifier("con{}".to_string());
+        let token11 = Token::Identifier("add:".to_string());
+
+        let expected = vec![
+            &token1,
+            &token2,
+            &token3,
+            &token4,
+            &token5,
+            &token6,
+            &token7,
+            &token8,
+            &token9,
+            &token10,
+            &token11,
+        ];
+
+        let result = many_till(alt((identifier_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing identifiers: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing identifiers");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+        
+        assert_eq!(tokens, expected, "Identifiers were not parsed correctly");
+    }
 
 
 }
