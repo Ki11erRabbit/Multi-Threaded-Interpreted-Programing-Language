@@ -10,6 +10,22 @@ MIL?
 
 ### Operators
 
+| Name | Operator | Example | Description | Implementation Notes |
+|------|----------|---------|-------------|----------------------|
+| Assignment | `=` | `x = 2` | Assigns a value to an immutable variable | Under the hood theses will be Rust Immutable References |
+| Mutable Assignment | `:=` | `x := 2` | Assigns a value to a mutable variable | Under the hood these will be Rust Mutable References |
+| Indexing | `[]` | `list[2]` | Allows for accessing a data structure via an index value | Can be redefined with a Certain Type Class |
+| Attribute Operator | `@` | `@Atomic`<br />`x := 2`<br />`Thread-Spawn`<br />`fn calculate(x : Int) -> Int` | Used to add Attributes to global variables and functions. |  |
+| Product Type Access | `.` | `data.member` | Unnecessary With Style function calls<br />Used to access named parts of a product type. | This might get merged into the Koka-Style Function Call |
+| Koka-Style Function Call | `.` | `'a'.toInt()`<br />`map.get("Hello")`<br />`[1,2,3].map() fn (x) {x + 1}`<br /><br />`card.Suit` = `card.Suit()` | If the type of the first parameter of a function matches the type the first value being passed in then it can be called in this way. If the last parameter is a lambda then we can put the lambda outside of the parenthesis.<br />We might also take it one step further and make it so that if a function only takes one argument, we can drop the parenthesis. |  |
+| Namespace | `::` | `functional_io::open("data.csv", 'r')`  | Used for namespaces to prevent name collisions in files. |  |
+| Sum Type Access | `::` | `Maybe::None` | Used to specify the particular Sum Type and its value to prevent name collisions. |  |
+| Tuple Operator | `()` | `()`<br />`(3, 4)` | Used to create a new tuple or unpack one | This might be replaced by a function that takes a `...` or a `H-List` that returns a tuple for constructing one |
+| Exclusive Range | `..` | `1..10` | Used to create an iterable thing that we can convert into a list. |  |
+| Inclusive Range | `..=` | `1..=10` | Used to create an iterable thing that we can convert into a list. |  |
+| Wild Card | `_` | `for _ in 1..10` | Used to match anything in and disregard the value |  |
+| Match Arm | `=>` | `Maybe::None =>` | For use in match statements. |  |
+| Function Return Arrow | `->` | `fn add1(x: Int) -> Int` | For use in functions to indicate return type. | If the return value doesn't match the type, then we crash. |
 ### Keywords
 
 | Name | Description |
