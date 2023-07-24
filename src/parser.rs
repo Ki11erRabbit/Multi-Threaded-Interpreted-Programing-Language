@@ -5,8 +5,9 @@ use nom::{IResult, bytes::complete::*, combinator::*, sequence::*, multi::*, bra
 
 
 //TODO: Change String to &str
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
+    WhiteSpace,
     Number(String),
     String(String),
     Char(String),
@@ -57,8 +58,41 @@ pub enum Token {
 }
 
 
+fn whitespace_parser(input: &str) -> IResult<&str, Token> {
+    let (input, _) = many0(alt((
+        tag(" "),
+        tag("\t"),
+        tag("\n"),
+        tag("\r"),
+    )))(input)?;
+    Ok((input, Token::WhiteSpace))
+}
 
+fn eof_parser(input: &str) -> IResult<&str, Token> {
+    let (input, _) = eof(input)?;
+    Ok((input, Token::WhiteSpace))
+}
 
+fn type_parser(input: &str) -> IResult<&str, &str> {
+    if 3 > input.len() {
+        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
+    }
+    match &input[0..=3] {
+
+        "type" => {
+            if 5 > input.len() {
+                return Ok((&input[4..], "type"));
+            }
+
+            match &input [0..=5] {
+
+                "typeis" => Ok((&input[6..], "typeis")),
+                _ => Ok((&input[4..], "type")),
+            }
+        },
+        _ => Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
+    }
+}
 
 fn keyword_parser(input: &str) -> IResult<&str, &str> {
    let mut keyword = alt((
@@ -67,7 +101,7 @@ fn keyword_parser(input: &str) -> IResult<&str, &str> {
         tag("default"),
         tag("sum"),
         tag("product"),
-        tag("type"),
+        //tag("type"),
         tag("fn"),
         tag("match"),
         tag("while"),
@@ -80,15 +114,17 @@ fn keyword_parser(input: &str) -> IResult<&str, &str> {
         tag("continue"),
         tag("break"),
         tag("in"),
-        tag("typeis"),
+        //tag("typeis"),
         tag("effect"),
-        tag("with"),
+       tag("with"),
+       type_parser,
    ));
     let mut keyword = alt((
         keyword,
         tag("return"),
         tag("mod"),
-        tag("import")));
+        tag("import"),
+    ));
 
     keyword(input)
 }
@@ -337,4 +373,57 @@ fn identifier_parser(input: &str) -> IResult<&str, &str> {
 fn identifier_to_token(input: &str) -> IResult<&str, Token> {
     let (input, identifier) = identifier_parser(input)?;
     Ok((input, Token::Identifier(identifier.to_string())))
+}
+
+
+#[cfg(test)]
+mod lexer_tests {
+    use super::*;
+    use nom::{IResult, bytes::complete::*, combinator::*, sequence::*, multi::*, branch::*, character::complete::*};
+    
+    #[test]
+    fn keywords_test() {
+        let input = "class instance default sum product type fn match while elwhile for loop if elif else continue break in typeis effect with return mod import";
+        let expected = vec![
+            &Token::Class,
+            &Token::Instance,
+            &Token::Default,
+            &Token::Sum,
+            &Token::Product,
+            &Token::Type,
+            &Token::Function,
+            &Token::Match,
+            &Token::While,
+            &Token::ElWhile,
+            &Token::For,
+            &Token::Loop,
+            &Token::If,
+            &Token::Elif,
+            &Token::Else,
+            &Token::Continue,
+            &Token::Break,
+            &Token::In,
+            &Token::Typeis,
+            &Token::Effect,
+            &Token::With,
+            &Token::Return,
+            &Token::Mod,
+            &Token::Import,
+        ];
+
+        let result = many_till(alt((keyword_to_token,whitespace_parser)), eof_parser)(input);
+
+        if result.is_err() {
+            let err_msg = "Error parsing keywords: ".to_string() + result.unwrap_err().to_string().as_str();
+            eprintln!("{}", err_msg);
+            assert!(false, "Error parsing keywords");
+            return;
+        }
+
+        let (_, (tokens, _)) = result.unwrap();
+        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+
+        assert_eq!(tokens, expected, "Keywords were not parsed correctly");
+    }
+
 }
