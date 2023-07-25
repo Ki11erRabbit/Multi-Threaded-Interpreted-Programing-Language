@@ -655,8 +655,214 @@ mod char_tests {
 
         assert_eq!(token, Token::Char('\''), "Token not escaped char");
     }
+}
 
+
+fn literals() -> impl Parser<char, Token, Error = Simple<char>> {
+    strings()
+        .or(chars())
+        .or(numbers())
+}
+
+#[cfg(test)]
+mod literal_tests {
+    use super::*;
+
+    #[test]
+    fn test_string() {
+        let result = literals().parse("\"Hello World\"");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing string");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::String("Hello World".to_string()), "Token not string");
+    }
+
+    #[test]
+    fn test_char() {
+        let result = literals().parse("'a'");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing char");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Char('a'), "Token not char");
+    }
+
+    #[test]
+    fn test_number() {
+        let result = literals().parse("123.456e-10");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing number");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("123.456e-10".to_string()), "Token not number");
+    }
+}
+
+
+fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
+
+    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789");
+    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:=");
+
+    let cant_be = choice((
+        just(":="),
+        just("::"),
+        just("->"),
+        just("=>"),
+        just("."),
+        ));
+
+    let special_identifiers = choice((
+        just("get[]").map(|s| s.to_string()),
+        just("set[]").map(|s| s.to_string()),
+        just("con[]").map(|s| s.to_string()),
+        just("con{}").map(|s| s.to_string()),
+        just("add:").map(|s| s.to_string()),
+        just("remove:").map(|s| s.to_string()),
+    ));
+
+    let normal = cant_start_with
+        .then(cant_contain.repeated())
+        .map(|(c, s)| format!("{}{}", c, s.iter().collect::<String>()));
+
+    let basic_identifier = recursive(|identifier| {
+        cant_be.not()
+            .then(normal)
+            .map(|(c,s)| {c.to_string() + &s})
+    });
+
+    let identifier = choice((
+        special_identifiers,
+        basic_identifier,
+    ))
+    .map(|s| Token::Identifier(s));
+        
+        
     
+
+    identifier.padded()
+}
+
+#[cfg(test)]
+mod identifier_tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_identifier() {
+        let result = identifiers().parse("hello");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing simple identifier");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Identifier("hello".to_string()), "Token not simple identifier");
+    }
+
+    #[test]
+    fn test_complex_identifier() {
+        let result = identifiers().parse("helloWorld123");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing complex identifier");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Identifier("helloWorld123".to_string()), "Token not complex identifier");
+    }
+
+    #[test]
+    fn test_special_identifier() {
+        let result = identifiers().parse("get[]");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing special identifier");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Identifier("get[]".to_string()), "Token not special identifier");
+    }
+
+    #[test]
+    fn test_foreign_identifiers() {
+        let result = identifiers().parse("かさ");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing foreign identifier");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Identifier("かさ".to_string()), "Token not foreign identifier");
+    }
+
+    #[test]
+    fn test_cant_start_with() {
+        let result = identifiers().parse("123");
+
+        if result.is_ok() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing identifier starting with number");
+        }
+    }
+
+    #[test]
+    fn test_cant_contain() {
+        let result = identifiers().parse("hello world");
+
+        if result.is_ok() {
+            eprintln!("{:?}", result);
+            assert_ne!(result.unwrap(),Token::Identifier("hello world".to_string()), "Error parsing identifier containing space");
+        }
+    }
+
+    #[test]
+    fn test_symbols() {
+        let result = identifiers().parse("++");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing symbol");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Identifier("++".to_string()), "Token not symbol");
+    }
+
+    #[test]
+    fn test_edge_case() {
+        let result = identifiers().parse("..");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing edge case");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Identifier("..".to_string()), "Token not edge case");
+    }
 
 }
 
