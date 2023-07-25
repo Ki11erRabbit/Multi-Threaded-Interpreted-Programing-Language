@@ -857,26 +857,26 @@ mod identifier_tests {
 
 pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
-    let line_comment = just("//")
+    /*let line_comment = just("//")
         .then(none_of("\r\n").repeated())
         .map(|(lm, s)| lm.to_string() + &s.iter().collect::<String>());
 
     let block_comment = just("/*")
         .then(none_of("*/").repeated())
-        .then(just("*/"))
-        .map(|((st, s), end)| st.to_string() + &s.iter().collect::<String>() + end);
+        .then(just("*///"))
+        //.map(|((st, s), end)| st.to_string() + &s.iter().collect::<String>() + end);
 
-    let comment = choice((
+    /*let comment = choice((
         line_comment,
         block_comment,
-    ));
+    ));*/
     
     
     let whitespace = one_of(" \n\t\r").repeated().map(|_| "".to_string());
     
     let token = recursive(|_| {
         choice((
-            comment.map(|s| Token::Comment(s)),
+            //comment.map(|s| Token::Comment(s)),
             whitespace.map(|s| Token::WhiteSpace(s)),
             identifiers(),
             literals(),
