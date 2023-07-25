@@ -1,7 +1,5 @@
-use ariadne::{sources, Color, Label, Report, ReportKind};
 use chumsky::prelude::*;
 
-use std::ops::Range;
 
 
 //TODO: Change String to &str
@@ -58,7 +56,7 @@ pub enum Token {
 }
 
 
-fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let keyword = recursive(|kwd| {
         
@@ -87,30 +85,30 @@ fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
         let mod_ = text::keyword::<_, _, Simple<char>>("mod").map(|_| Token::Mod).padded();
         let import = text::keyword::<_, _, Simple<char>>("import").map(|_| Token::Import).padded();
 
-        class
-            .or(instance)
-            .or(default)
-            .or(sum)
-            .or(product)
-            .or(type_)
-            .or(function)
-            .or(match_)
-            .or(while_)
-            .or(elwhile)
-            .or(for_)
-            .or(loop_)
-            .or(if_)
-            .or(elif)
-            .or(else_)
-            .or(continue_)
-            .or(break_)
-            .or(in_)
-            .or(typeis)
-            .or(effect)
-            .or(with)
-            .or(return_)
-            .or(mod_)
-            .or(import)
+        choice((class
+           ,instance
+           ,default
+           ,sum
+           ,product
+           ,type_
+           ,function
+           ,match_
+           ,while_
+           ,elwhile
+           ,for_
+           ,loop_
+           ,if_
+           ,elif
+           ,else_
+           ,continue_
+           ,break_
+           ,in_
+           ,typeis
+           ,effect
+           ,with
+           ,return_
+           ,mod_
+           ,import))
     });
 
     
@@ -120,7 +118,6 @@ fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
 #[cfg(test)]
 mod keywords_tests {
     use super::*;
-    use chumsky::prelude::*;
 
     #[test]
     fn test_class() {
@@ -167,7 +164,7 @@ mod keywords_tests {
 }
 
 
-fn operators() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn operators() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let operator = recursive(|op| {
         choice((
@@ -257,7 +254,7 @@ mod operator_tests {
 }
 
 
-fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let symbol = recursive(|sym| {
         choice((
@@ -658,7 +655,7 @@ mod char_tests {
 }
 
 
-fn literals() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn literals() -> impl Parser<char, Token, Error = Simple<char>> {
     strings()
         .or(chars())
         .or(numbers())
@@ -712,7 +709,7 @@ mod literal_tests {
 }
 
 
-fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
+pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789");
     let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
