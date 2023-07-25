@@ -523,11 +523,33 @@ mod number_tests {
 }
 
 fn strings() -> impl Parser<char, Token, Error = Simple<char>> {
-    let string = just('\"')
+
+    let escape = just::<char, char, Simple<char>>('\\')
+        .then(one_of("\"\\nrt "))
+        .map(|(_, c)| match c {
+            '"' => '"',
+            '\\' => '\\',
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            ' ' => ' ',
+            _ => unreachable!()
+        });
+
+    let string_char = none_of("\"\\")
+        .or(escape);
+
+    let string = just('"')
+        .ignore_then(string_char.repeated())
+        .then_ignore(just('"'))
+        .then_ignore(end())
+        .map(|s| Token::String(s.iter().collect()));
+    
+    /*let string = just('\"')
         .ignore_then(none_of("\"").repeated())
         .then_ignore(one_of("\""))
         .then_ignore(end())
-        .map(|s| Token::String(s.iter().collect()));
+        .map(|s| Token::String(s.iter().collect()));*/
 
     string.padded()
 }
@@ -562,6 +584,20 @@ mod string_tests {
         let token = result.unwrap();
 
         assert_eq!(token, Token::String("Hello \"World\"".to_string()), "Token not escaped string");
+    }
+
+    #[test]
+    fn test_escapes_string() {
+        let result = strings().parse("\"Hello \\\\ \\n \\r \\t\"");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing escapes string");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::String("Hello \\ \n \r \t".to_string()), "Token not escapes string");
     }
 
 }
