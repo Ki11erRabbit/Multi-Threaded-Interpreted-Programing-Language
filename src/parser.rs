@@ -10,7 +10,7 @@ pub enum Token {
     WhiteSpace,
     Number(String),
     String(String),
-    Char(String),
+    Char(char),
     Identifier(String),
     Operator(String),
     Assignment, // =
@@ -545,11 +545,6 @@ fn strings() -> impl Parser<char, Token, Error = Simple<char>> {
         .then_ignore(end())
         .map(|s| Token::String(s.iter().collect()));
     
-    /*let string = just('\"')
-        .ignore_then(none_of("\"").repeated())
-        .then_ignore(one_of("\""))
-        .then_ignore(end())
-        .map(|s| Token::String(s.iter().collect()));*/
 
     string.padded()
 }
@@ -599,6 +594,69 @@ mod string_tests {
 
         assert_eq!(token, Token::String("Hello \\ \n \r \t".to_string()), "Token not escapes string");
     }
+
+}
+
+fn chars() -> impl Parser<char, Token, Error = Simple<char>> {
+    
+    let escape = just::<char, char, Simple<char>>('\\')
+        .then(one_of("\'\\nrt "))
+        .map(|(_, c)| match c {
+            '\'' => '\'',
+            '\\' => '\\',
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            ' ' => ' ',
+            _ => unreachable!()
+        });
+
+    let possible_char = none_of("'\\")
+        .or(escape);
+
+    let char_ = just('\'')
+        .ignore_then(possible_char)
+        .then_ignore(just('\''))
+        .then_ignore(end())
+        .map(|s| Token::Char(s));
+    
+
+    char_.padded()
+}
+
+#[cfg(test)]
+mod char_tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_char() {
+        let result = chars().parse("'a'");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing basic char");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Char('a'), "Token not basic char");
+    }
+
+    #[test]
+    fn test_escaped_char() {
+        let result = chars().parse("'\\''");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing escaped char");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Char('\''), "Token not escaped char");
+    }
+
+    
 
 }
 
