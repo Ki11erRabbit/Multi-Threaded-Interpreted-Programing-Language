@@ -1,7 +1,8 @@
 
 
-use nom::{IResult, bytes::complete::*, combinator::*, sequence::*, multi::*, branch::*, character::complete::*};
+use nom::{IResult, bytes::complete::*, combinator::*, sequence::*, multi::*, branch::*, character::complete::*, character::*};
 
+use std::sync::atomic::{AtomicBool,Ordering};
 
 
 //TODO: Change String to &str
@@ -68,13 +69,23 @@ fn whitespace_parser(input: &str) -> IResult<&str, Token> {
     Ok((input, Token::WhiteSpace))
 }
 
+fn whitespace(input: &str) -> IResult<&str, &str> {
+    let (input, _) = many1(alt((
+        tag(" "),
+        tag("\t"),
+        tag("\n"),
+        tag("\r"),
+    )))(input)?;
+    Ok((input, " "))
+}
+
 fn eof_parser(input: &str) -> IResult<&str, Token> {
     let (input, _) = eof(input)?;
     Ok((input, Token::WhiteSpace))
 }
 
 fn type_parser(input: &str) -> IResult<&str, &str> {
-    if 3 > input.len() {
+    if 4 > input.len() {
         return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
     }
     match &input[0..=3] {
@@ -190,14 +201,20 @@ fn keyword_to_token(input: &str) -> IResult<&str, Token> {
     }
 }
 
-fn operator_parser(input: &str) -> IResult<&str, &str> {
+fn operator_parser_without_period(input: &str) -> IResult<&str, &str> {
     alt((
-        tag("."),
         tag("="),
         tag(":="),
         tag("@"),
         tag(":"),
         tag("_"),
+    ))(input)
+}
+
+fn operator_parser(input: &str) -> IResult<&str, &str> {
+    alt((
+        tag("."),
+        operator_parser_without_period,
     ))(input)
 }
 
@@ -250,14 +267,122 @@ fn symbol_to_token(input: &str) -> IResult<&str, Token> {
 }
 
 fn number_parser(input: &str) -> IResult<&str, &str> {
-    take_while(|c: char| {c.is_numeric() || c == '.' || c == 'x' || c == 'o' || c == 'i' || c == 'u' || c == 'X' || c == 'O' || c == 'I' || c == 'U' ||
+    /*take_while(|c: char| {c.is_numeric() || c == '.' || c == 'x' || c == 'o' || c == 'i' || c == 'u' || c == 'X' || c == 'O' || c == 'I' || c == 'U' ||
                c == 'a' || c == 'b' || c == 'c' || c == 'd' ||
                c == 'e' || c == 'f' || c == 'A' || c == 'B' ||
-                          c == 'C' || c == 'D' || c == 'E' || c == 'F'})(input)
+                          c == 'C' || c == 'D' || c == 'E' || c == 'F'})(input)*/
+
+    let start = 0;
+    let mut end = 0;
+    let mut found_decimal = false;
+
+    for (i, c) in input.chars().enumerate() {
+        if c.is_numeric() || c == '.' || c == 'x' || c == 'o' || c == 'i' || c == 'u' || c == 'X' || c == 'O' || c == 'I' || c == 'U' ||
+               c == 'a' || c == 'b' || c == 'c' || c == 'd' ||
+               c == 'e' || c == 'f' || c == 'A' || c == 'B' ||
+            c == 'C' || c == 'D' || c == 'E' || c == 'F' {
+                if c == '.' {
+                    if found_decimal {
+                        end = i;
+                        break;
+                    } else {
+                    found_decimal = true;
+                    }
+                }
+        } else {
+            end = i;
+            break;
+        }
+    }
+
+    Ok((&input[end..], &input[start..end]))
+/*
+    
+    let mut int_prefixes = alt((
+        tag("0x"),
+        tag("0o"),
+        tag("0b"),
+        tag("0X"),
+        tag("0O"),
+        tag("0B"),
+    ));
+
+    let mut int_suffixes = alt((
+        tag("u"),
+        tag("i"),
+        tag("U"),
+        tag("I"),
+    ));
+
+    let mut exponent = alt((
+        tag("e"),
+        tag("E"),
+    ));
+
+    let mut float_suffixes = alt((
+        tag("f"),
+        tag("F"),
+    ));
+
+    let mut dec_numbers = alt((
+        tag("0"),
+        tag("1"),
+        tag("2"),
+        tag("3"),
+        tag("4"),
+        tag("5"),
+        tag("6"),
+        tag("7"),
+        tag("8"),
+        tag("9"),
+    ));
+
+    let mut hex_numbers = alt((
+        tag("a"),
+        tag("b"),
+        tag("c"),
+        tag("d"),
+        tag("e"),
+        tag("f"),
+        tag("A"),
+        tag("B"),
+        tag("C"),
+        tag("D"),
+        tag("E"),
+        tag("F"),
+    ));
+
+    let mut decimal_point = tag(".");
+
+
+    alt((int_prefixes, int_suffixes, exponent, float_suffixes, dec_numbers, hex_numbers, decimal_point))(input)*/
 }
+
+/*fn decimal_point(input : &str) -> IResult<&str, &str> {
+    match FOUND_DECIMAL_POINT.load(Ordering::Relaxed) {
+        true => {
+            FOUND_DECIMAL_POINT.store(false, Ordering::Relaxed);
+            Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+        },
+        false => {
+            FOUND_DECIMAL_POINT.store(true, Ordering::Relaxed);
+            tag(".")(input)
+        }
+    }
+}
+
+static FOUND_DECIMAL_POINT: AtomicBool = AtomicBool::new(false);*/
 
 fn number_to_token(input: &str) -> IResult<&str, Token> {
     let (input, number) = number_parser(input)?;
+
+    //let (input, (mini_tokens, _)) = many_till(number_parser, alt((whitespace, keyword_parser, operator_parser_without_period, symbol_parser)))(input)?;
+
+    //let mut number = String::new();
+    //mini_tokens.iter().for_each(|s| number.push_str(s));
+
+
+    
     Ok((input, Token::Number(number.to_string())))
 }
 
@@ -492,7 +617,7 @@ mod lexer_tests {
 
     #[test]
     fn numbers_test() {
-        let input = "42 3.14 0.1e10 0xAf 0o23 0o101 42i 42U";
+        let input = "42 3.14 0.1e10 0xAf 0o23 0o101 42i 42U ";
 
         let token1 = Token::Number("42".to_string());
         let token2 = Token::Number("3.14".to_string());
