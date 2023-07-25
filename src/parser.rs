@@ -1,8 +1,7 @@
+use ariadne::{sources, Color, Label, Report, ReportKind};
+use chumsky::prelude::*;
 
-
-use nom::{IResult, bytes::complete::*, combinator::*, sequence::*, multi::*, branch::*, character::complete::*, character::*};
-
-use std::sync::atomic::{AtomicBool,Ordering};
+use std::ops::Range;
 
 
 //TODO: Change String to &str
@@ -29,7 +28,7 @@ pub enum Token {
     Namespace, // ::
     Period, // .
     WildCard, // _
-    Comment(String),
+    Comment,
     MatchArm, // =>
     FunctionReturn, // ->
     Class,
@@ -59,706 +58,192 @@ pub enum Token {
 }
 
 
-fn whitespace_parser(input: &str) -> IResult<&str, Token> {
-    let (input, _) = many0(alt((
-        tag(" "),
-        tag("\t"),
-        tag("\n"),
-        tag("\r"),
-    )))(input)?;
-    Ok((input, Token::WhiteSpace))
-}
+fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
 
-fn whitespace(input: &str) -> IResult<&str, &str> {
-    let (input, _) = many1(alt((
-        tag(" "),
-        tag("\t"),
-        tag("\n"),
-        tag("\r"),
-    )))(input)?;
-    Ok((input, " "))
-}
-
-fn eof_parser(input: &str) -> IResult<&str, Token> {
-    let (input, _) = eof(input)?;
-    Ok((input, Token::WhiteSpace))
-}
-
-fn type_parser(input: &str) -> IResult<&str, &str> {
-    if 4 > input.len() {
-        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
-    }
-    match &input[0..=3] {
-
-        "type" => {
-            if 5 > input.len() {
-                return Ok((&input[4..], "type"));
-            }
-
-            match &input [0..=5] {
-
-                "typeis" => Ok((&input[6..], "typeis")),
-                _ => Ok((&input[4..], "type")),
-            }
-        },
-        _ => Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-    }
-}
-
-fn keyword_parser(input: &str) -> IResult<&str, &str> {
-   let mut keyword = alt((
-        tag("class"),
-        tag("instance"),
-        tag("default"),
-        tag("sum"),
-        tag("product"),
-        //tag("type"),
-        tag("fn"),
-        tag("match"),
-        tag("while"),
-        tag("elwhile"),
-        tag("for"),
-        tag("loop"),
-        tag("if"),
-        tag("elif"),
-        tag("else"),
-        tag("continue"),
-        tag("break"),
-        tag("in"),
-        //tag("typeis"),
-        tag("effect"),
-       tag("with"),
-       type_parser,
-   ));
-    let mut keyword = alt((
-        keyword,
-        tag("return"),
-        tag("mod"),
-        tag("import"),
-    ));
-
-    keyword(input)
-}
-
-fn is_keyword(input: &str) -> bool {
-    match input {
-        "class" => true,
-        "instance" => true,
-        "default" => true,
-        "sum" => true,
-        "product" => true,
-        "type" => true,
-        "fn" => true,
-        "match" => true,
-        "while" => true,
-        "elwhile" => true,
-        "for" => true,
-        "loop" => true,
-        "if" => true,
-        "elif" => true,
-        "else" => true,
-        "continue" => true,
-        "break" => true,
-        "in" => true,
-        "typeis" => true,
-        "effect" => true,
-        "with" => true,
-        "return" => true,
-        "mod" => true,
-        "import" => true,
-        _ => false,
-    }
-}
-
-fn keyword_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, keyword) = keyword_parser(input)?;
-    match keyword {
-        "class" => Ok((input, Token::Class)),
-        "instance" => Ok((input, Token::Instance)),
-        "default" => Ok((input, Token::Default)),
-        "sum" => Ok((input, Token::Sum)),
-        "product" => Ok((input, Token::Product)),
-        "type" => Ok((input, Token::Type)),
-        "fn" => Ok((input, Token::Function)),
-        "match" => Ok((input, Token::Match)),
-        "while" => Ok((input, Token::While)),
-        "elwhile" => Ok((input, Token::ElWhile)),
-        "for" => Ok((input, Token::For)),
-        "loop" => Ok((input, Token::Loop)),
-        "if" => Ok((input, Token::If)),
-        "elif" => Ok((input, Token::Elif)),
-        "else" => Ok((input, Token::Else)),
-        "continue" => Ok((input, Token::Continue)),
-        "break" => Ok((input, Token::Break)),
-        "in" => Ok((input, Token::In)),
-        "typeis" => Ok((input, Token::Typeis)),
-        "effect" => Ok((input, Token::Effect)),
-        "with" => Ok((input, Token::With)),
-        "return" => Ok((input, Token::Return)),
-        "mod" => Ok((input, Token::Mod)),
-        "import" => Ok((input, Token::Import)),
-        _ => Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-    }
-}
-
-fn operator_parser_without_period(input: &str) -> IResult<&str, &str> {
-    alt((
-        tag("="),
-        tag(":="),
-        tag("@"),
-        tag(":"),
-        tag("_"),
-    ))(input)
-}
-
-fn operator_parser(input: &str) -> IResult<&str, &str> {
-    alt((
-        tag("."),
-        operator_parser_without_period,
-    ))(input)
-}
-
-fn operator_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, operator) = operator_parser(input)?;
-    match operator {
-        "." => Ok((input, Token::Period)),
-        "=" => Ok((input, Token::Assignment)),
-        ":=" => Ok((input, Token::MutableAssignment)),
-        "@" => Ok((input, Token::Attribute)),
-        ":" => Ok((input, Token::Colon)),
-        "_" => Ok((input, Token::WildCard)),
-        _ => Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-    }
-}
-
-
-fn symbol_parser(input: &str) -> IResult<&str, &str> {
-    alt((
-        tag("["),
-        tag("]"),
-        tag("("),
-        tag(")"),
-        tag("{"),
-        tag("}"),
-        tag(";"),
-        tag("->"),
-        tag("=>"),
-        tag("::"),
-        tag(","),
-    ))(input)
-}
-
-fn symbol_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, symbol) = symbol_parser(input)?;
-    match symbol {
-        "[" => Ok((input, Token::BracketLeft)),
-        "]" => Ok((input, Token::BracketRight)),
-        "(" => Ok((input, Token::ParenLeft)),
-        ")" => Ok((input, Token::ParenRight)),
-        "{" => Ok((input, Token::CurlyLeft)),
-        "}" => Ok((input, Token::CurlyRight)),
-        ";" => Ok((input, Token::Semicolon)),
-        "->" => Ok((input, Token::FunctionReturn)),
-        "=>" => Ok((input, Token::MatchArm)),
-        "::" => Ok((input, Token::Namespace)),
-        "," => Ok((input, Token::Comma)),
-        _ => Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))),
-    }
-}
-
-fn number_parser(input: &str) -> IResult<&str, &str> {
-    /*take_while(|c: char| {c.is_numeric() || c == '.' || c == 'x' || c == 'o' || c == 'i' || c == 'u' || c == 'X' || c == 'O' || c == 'I' || c == 'U' ||
-               c == 'a' || c == 'b' || c == 'c' || c == 'd' ||
-               c == 'e' || c == 'f' || c == 'A' || c == 'B' ||
-                          c == 'C' || c == 'D' || c == 'E' || c == 'F'})(input)*/
-
-    let start = 0;
-    let mut end = 0;
-    let mut found_decimal = false;
-
-    for (i, c) in input.chars().enumerate() {
-        if c.is_numeric() || c == '.' || c == 'x' || c == 'o' || c == 'i' || c == 'u' || c == 'X' || c == 'O' || c == 'I' || c == 'U' ||
-               c == 'a' || c == 'b' || c == 'c' || c == 'd' ||
-               c == 'e' || c == 'f' || c == 'A' || c == 'B' ||
-            c == 'C' || c == 'D' || c == 'E' || c == 'F' {
-                if c == '.' {
-                    if found_decimal {
-                        end = i;
-                        break;
-                    } else {
-                    found_decimal = true;
-                    }
-                }
-        } else {
-            end = i;
-            break;
-        }
-    }
-
-    Ok((&input[end..], &input[start..end]))
-/*
-    
-    let mut int_prefixes = alt((
-        tag("0x"),
-        tag("0o"),
-        tag("0b"),
-        tag("0X"),
-        tag("0O"),
-        tag("0B"),
-    ));
-
-    let mut int_suffixes = alt((
-        tag("u"),
-        tag("i"),
-        tag("U"),
-        tag("I"),
-    ));
-
-    let mut exponent = alt((
-        tag("e"),
-        tag("E"),
-    ));
-
-    let mut float_suffixes = alt((
-        tag("f"),
-        tag("F"),
-    ));
-
-    let mut dec_numbers = alt((
-        tag("0"),
-        tag("1"),
-        tag("2"),
-        tag("3"),
-        tag("4"),
-        tag("5"),
-        tag("6"),
-        tag("7"),
-        tag("8"),
-        tag("9"),
-    ));
-
-    let mut hex_numbers = alt((
-        tag("a"),
-        tag("b"),
-        tag("c"),
-        tag("d"),
-        tag("e"),
-        tag("f"),
-        tag("A"),
-        tag("B"),
-        tag("C"),
-        tag("D"),
-        tag("E"),
-        tag("F"),
-    ));
-
-    let mut decimal_point = tag(".");
-
-
-    alt((int_prefixes, int_suffixes, exponent, float_suffixes, dec_numbers, hex_numbers, decimal_point))(input)*/
-}
-
-/*fn decimal_point(input : &str) -> IResult<&str, &str> {
-    match FOUND_DECIMAL_POINT.load(Ordering::Relaxed) {
-        true => {
-            FOUND_DECIMAL_POINT.store(false, Ordering::Relaxed);
-            Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
-        },
-        false => {
-            FOUND_DECIMAL_POINT.store(true, Ordering::Relaxed);
-            tag(".")(input)
-        }
-    }
-}
-
-static FOUND_DECIMAL_POINT: AtomicBool = AtomicBool::new(false);*/
-
-fn number_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, number) = number_parser(input)?;
-
-    //let (input, (mini_tokens, _)) = many_till(number_parser, alt((whitespace, keyword_parser, operator_parser_without_period, symbol_parser)))(input)?;
-
-    //let mut number = String::new();
-    //mini_tokens.iter().for_each(|s| number.push_str(s));
-
-
-    
-    Ok((input, Token::Number(number.to_string())))
-}
-
-fn string_parser(input: &str) -> IResult<&str, &str> {
-    let mut start = 0;
-    let mut end = 0;
-    let mut escaped = false;
-    if !(input.chars().nth(0) == Some('"')) {
-        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
-    }
-    for (i, c) in input.chars().enumerate() {
-        if c == '"' && !escaped {
-            end = i;
-            break;
-        }
-        if c == '\\' {
-            escaped = true;
-        } else {
-            escaped = false;
-        }
-    }
-
-    if end == 0 {
-        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
-    } else {
-        Ok((&input[end..], &input[start..end]))
-    }
-}
-
-fn string_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, string) = string_parser(input)?;
-    Ok((input, Token::String(string.to_string())))
-}
-
-fn char_parser(input: &str) -> IResult<&str, &str> {
-    let mut start = 0;
-    let mut end = 0;
-    let mut escaped = false;
-    if !(input.chars().nth(0) == Some('\'')) {
-        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
-    }
-    for (i, c) in input.chars().enumerate() {
-        if c == '\'' && !escaped {
-            end = i;
-            break;
-        }
-        if c == '\\' {
-            escaped = true;
-        } else {
-            escaped = false;
-        }
-    }
-
-    if end == 0 {
-        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
-    } else {
-        Ok((&input[end..], &input[start..end]))
-    }
-}
-
-fn char_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, c) = char_parser(input)?;
-    Ok((input, Token::Char(c.to_string())))
-}
-
-fn literal_parser(input: &str) -> IResult<&str, Token> {
-    alt((
-        number_to_token,
-        string_to_token,
-        char_to_token,
-    ))(input)
-}
+    let keyword = recursive(|kwd| {
         
-fn identifier_parser(input: &str) -> IResult<&str, &str> {
-    let first = input.chars().nth(0);
+        let class = text::keyword::<_, _, Simple<char>>("class").map(|_| Token::Class);
+        let instance = text::keyword::<_, _, Simple<char>>("instance").map(|_| Token::Instance);
+        let default = text::keyword::<_, _, Simple<char>>("default").map(|_| Token::Default);
+        let sum = text::keyword::<_, _, Simple<char>>("sum").map(|_| Token::Sum);
+        let product = text::keyword::<_, _, Simple<char>>("product").map(|_| Token::Product);
+        let type_ = text::keyword::<_, _, Simple<char>>("type").map(|_| Token::Type);
+        let function = text::keyword::<_, _, Simple<char>>("fn").map(|_| Token::Function);
+        let match_ = text::keyword::<_, _, Simple<char>>("match").map(|_| Token::Match);
+        let while_ = text::keyword::<_, _, Simple<char>>("while").map(|_| Token::While);
+        let elwhile = text::keyword::<_, _, Simple<char>>("elwhile").map(|_| Token::ElWhile);
+        let for_ = text::keyword::<_, _, Simple<char>>("for").map(|_| Token::For);
+        let loop_ = text::keyword::<_, _, Simple<char>>("loop").map(|_| Token::Loop);
+        let if_ = text::keyword::<_, _, Simple<char>>("if").map(|_| Token::If);
+        let elif = text::keyword::<_, _, Simple<char>>("elif").map(|_| Token::Elif);
+        let else_ = text::keyword::<_, _, Simple<char>>("else").map(|_| Token::Else);
+        let continue_ = text::keyword::<_, _, Simple<char>>("continue").map(|_| Token::Continue);
+        let break_ = text::keyword::<_, _, Simple<char>>("break").map(|_| Token::Break);
+        let in_ = text::keyword::<_, _, Simple<char>>("in").map(|_| Token::In);
+        let typeis = text::keyword::<_, _, Simple<char>>("typeis").map(|_| Token::Typeis);
+        let effect = text::keyword::<_, _, Simple<char>>("effect").map(|_| Token::Effect);
+        let with = text::keyword::<_, _, Simple<char>>("with").map(|_| Token::With);
+        let return_ = text::keyword::<_, _, Simple<char>>("return").map(|_| Token::Return);
+        let mod_ = text::keyword::<_, _, Simple<char>>("mod").map(|_| Token::Mod);
+        let import = text::keyword::<_, _, Simple<char>>("import").map(|_| Token::Import);
 
-    if first == Some('1') || first == Some('2') || first == Some('3') || first == Some('4') ||
-        first == Some('5') || first == Some('6') || first == Some('7') || first == Some('8') ||
-        first == Some('9') || first == Some('0') || first == Some(',') ||
-        first == Some('"') || first == Some('\'') || first == Some('[') || first == Some(']') ||
-        first == Some('(') || first == Some(')') || first == Some('@') {
-            return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
+        class
+            .or(instance)
+            .or(default)
+            .or(sum)
+            .or(product)
+            .or(type_)
+            .or(function)
+            .or(match_)
+            .or(while_)
+            .or(elwhile)
+            .or(for_)
+            .or(loop_)
+            .or(if_)
+            .or(elif)
+            .or(else_)
+            .or(continue_)
+            .or(break_)
+            .or(in_)
+            .or(typeis)
+            .or(effect)
+            .or(with)
+            .or(return_)
+            .or(mod_)
+            .or(import)
+    });
+
+    
+    keyword
+}
+
+#[cfg(test)]
+mod keywords_tests {
+    use super::*;
+    use chumsky::prelude::*;
+
+    #[test]
+    fn test_class() {
+        let result = keywords().parse("class");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing class");
         }
 
-    let restrict = |c : char| {c.is_whitespace() || c == ',' || c == '"' || c == '\'' ||
-                             c == '[' || c == ']' || c == '(' || c == ')' || c == ':' ||
-                             c == '@' || c == '{' || c == '}'};
-    
-    if first == Some('.') && input.chars().nth(1) != None && !restrict(input.chars().nth(1).unwrap()) {
-        // This is so that we can parse things like "...", "..", and "..=" but not "."
-        return take_till(restrict)(input);
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Class, "Error parsing class");
     }
-    
-    alt((
-        take_till(|c: char| {c.is_whitespace() || c == '.' || c == ',' || c == '"' || c == '\'' ||
-                             c == '[' || c == ']' || c == '(' || c == ')' || c == ';' || c == ':' ||
-                             c == '=' || c == '@' || c == '{' || c == '}'
-        }),
-        //Getters and setters for the index operator ([])
-        tag("get[]"),
-        tag("set[]"),
-        //Constructor for the square brackets
-        tag("con[]"),
-        //Constructor for the curly braces
-        tag("con{}"),
-        //Cons operator and list deconstructor
-        tag("add:"),
-        tag("remove:")
+    #[test]
+    fn test_instance() {
+        let result = keywords().parse("instance");
 
-    ))(input)
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing instance");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Instance, "Error parsing instance");
+    }
+
+    #[test]
+    fn test_return() {
+        let result = keywords().parse("return");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing return");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Return, "Error parsing return");
+    }
+
+
 }
 
-fn identifier_to_token(input: &str) -> IResult<&str, Token> {
-    let (input, identifier) = identifier_parser(input)?;
-    Ok((input, Token::Identifier(identifier.to_string())))
+
+fn operators() -> impl Parser<char, Token, Error = Simple<char>> {
+
+    let operator = recursive(|op| {
+        choice((
+            just("=").to(Token::Assignment).padded(),
+            just(":").to(Token::Colon),
+            just(".").to(Token::Period),
+            just(":=").to(Token::MutableAssignment),
+            just("@").to(Token::Attribute),
+            just("_").to(Token::WildCard),
+            ))
+    });
+
+    operator
 }
+
 
 
 #[cfg(test)]
-mod lexer_tests {
+mod operator_tests {
     use super::*;
-    use nom::{IResult, bytes::complete::*, combinator::*, sequence::*, multi::*, branch::*, character::complete::*};
-    
-    #[test]
-    fn keywords_test() {
-        let input = "class instance default sum product type fn match while elwhile for loop if elif else continue break in typeis effect with return mod import";
-        let expected = vec![
-            &Token::Class,
-            &Token::Instance,
-            &Token::Default,
-            &Token::Sum,
-            &Token::Product,
-            &Token::Type,
-            &Token::Function,
-            &Token::Match,
-            &Token::While,
-            &Token::ElWhile,
-            &Token::For,
-            &Token::Loop,
-            &Token::If,
-            &Token::Elif,
-            &Token::Else,
-            &Token::Continue,
-            &Token::Break,
-            &Token::In,
-            &Token::Typeis,
-            &Token::Effect,
-            &Token::With,
-            &Token::Return,
-            &Token::Mod,
-            &Token::Import,
-        ];
-
-        let result = many_till(alt((keyword_to_token,whitespace_parser)), eof_parser)(input);
-
-        if result.is_err() {
-            let err_msg = "Error parsing keywords: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing keywords");
-            return;
-        }
-
-        let (_, (tokens, _)) = result.unwrap();
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
-
-        assert_eq!(tokens, expected, "Keywords were not parsed correctly");
-    }
-
+    use chumsky::prelude::*;
 
     #[test]
-    fn operators_test() {
-        let input = ". = := @ : _";
-
-        let expected = vec![
-            &Token::Period,
-            &Token::Assignment,
-            &Token::MutableAssignment,
-            &Token::Attribute,
-            &Token::Colon,
-            &Token::WildCard,
-        ];
-
-        let result = many_till(alt((operator_to_token,whitespace_parser)), eof_parser)(input);
+    fn test_assignment() {
+        let result = operators().parse("=");
 
         if result.is_err() {
-            let err_msg = "Error parsing operators: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing operators");
-            return;
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing assignment");
         }
 
-        let (_, (tokens, _)) = result.unwrap();
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
+        let token = result.unwrap();
 
-        assert_eq!(tokens, expected, "Operators were not parsed correctly");
-    }
-
-
-    #[test]
-    fn symbols_test() {
-        let input = "[ ] ( ) { } , ; -> => ::";
-
-        let expected = vec![
-            &Token::BracketLeft,
-            &Token::BracketRight,
-            &Token::ParenLeft,
-            &Token::ParenRight,
-            &Token::CurlyLeft,
-            &Token::CurlyRight,
-            &Token::Comma,
-            &Token::Semicolon,
-            &Token::FunctionReturn,
-            &Token::MatchArm,
-            &Token::Namespace,
-        ];
-
-        let result = many_till(alt((symbol_to_token,whitespace_parser)), eof_parser)(input);
-
-        if result.is_err() {
-            let err_msg = "Error parsing symbols: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing symbols");
-            return;
-        }
-
-        let (_, (tokens, _)) = result.unwrap();
-
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
-
-        assert_eq!(tokens, expected, "Symbols were not parsed correctly");
+        assert_eq!(token, Token::Assignment, "Token not assignment");
     }
 
     #[test]
-    fn numbers_test() {
-        let input = "42 3.14 0.1e10 0xAf 0o23 0o101 42i 42U ";
-
-        let token1 = Token::Number("42".to_string());
-        let token2 = Token::Number("3.14".to_string());
-        let token3 = Token::Number("0.1e10".to_string());
-        let token4 = Token::Number("0xAf".to_string());
-        let token5 = Token::Number("0o23".to_string());
-        let token6 = Token::Number("0o101".to_string());
-        let token7 = Token::Number("42i".to_string());
-        let token8 = Token::Number("42U".to_string());
-        
-        let expected = vec![
-            &token1,
-            &token2,
-            &token3,
-            &token4,
-            &token5,
-            &token6,
-            &token7,
-            &token8,
-        ];
-
-        let result = many_till(alt((number_to_token,whitespace_parser)), eof_parser)(input);
+    fn test_colon() {
+        let result = operators().parse(":");
 
         if result.is_err() {
-            let err_msg = "Error parsing numbers: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing numbers");
-            return;
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing colon");
         }
 
-        let (_, (tokens, _)) = result.unwrap();
+        let token = result.unwrap();
 
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
-
-        assert_eq!(tokens, expected, "Numbers were not parsed correctly");
+        assert_eq!(token, Token::Colon, "Token not colon");
     }
 
     #[test]
-    fn strings_test() {
-        let input = "\"Hello World\" \"Hello \\\"world\\\"";
-
-        let token1 = Token::String("Hello World".to_string());
-        let token2 = Token::String("Hello \\\"world\\\"".to_string());
-
-        let expected = vec![
-            &token1,
-            &token2,
-        ];
-
-        let result = many_till(alt((string_to_token,whitespace_parser)), eof_parser)(input);
+    fn test_period() {
+        let result = operators().parse(".");
 
         if result.is_err() {
-            let err_msg = "Error parsing strings: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing strings");
-            return;
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing period");
         }
 
-        let (_, (tokens, _)) = result.unwrap();
+        let token = result.unwrap();
 
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
-
-        assert_eq!(tokens, expected, "Strings were not parsed correctly");
-    }
-
-    #[test]
-    fn chars_test() {
-        let input = "'a' '\\n' '\\''";
-
-        let token1 = Token::Char("a".to_string());
-        let token2 = Token::Char("\n".to_string());
-        let token3 = Token::Char("'".to_string());
-
-        let expected = vec![
-            &token1,
-            &token2,
-            &token3,
-        ];
-
-        let result = many_till(alt((char_to_token,whitespace_parser)), eof_parser)(input);
-
-        if result.is_err() {
-            let err_msg = "Error parsing chars: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing chars");
-            return;
-        }
-
-        let (_, (tokens, _)) = result.unwrap();
-
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
-
-        assert_eq!(tokens, expected, "Chars were not parsed correctly");
-    }
-
-
-    #[test]
-    fn identifiers_test() {
-        let input = "hello world2 _hello &hello .. ..= && >>= get[] con{} add:";
-
-        let token1 = Token::Identifier("hello".to_string());
-        let token2 = Token::Identifier("world2".to_string());
-        let token3 = Token::Identifier("_hello".to_string());
-        let token4 = Token::Identifier("&hello".to_string());
-        let token5 = Token::Identifier("..".to_string());
-        let token6 = Token::Identifier("..=".to_string());
-        let token7 = Token::Identifier("&&".to_string());
-        let token8 = Token::Identifier(">>=".to_string());
-        let token9 = Token::Identifier("get[]".to_string());
-        let token10 = Token::Identifier("con{}".to_string());
-        let token11 = Token::Identifier("add:".to_string());
-
-        let expected = vec![
-            &token1,
-            &token2,
-            &token3,
-            &token4,
-            &token5,
-            &token6,
-            &token7,
-            &token8,
-            &token9,
-            &token10,
-            &token11,
-        ];
-
-        let result = many_till(alt((identifier_to_token,whitespace_parser)), eof_parser)(input);
-
-        if result.is_err() {
-            let err_msg = "Error parsing identifiers: ".to_string() + result.unwrap_err().to_string().as_str();
-            eprintln!("{}", err_msg);
-            assert!(false, "Error parsing identifiers");
-            return;
-        }
-
-        let (_, (tokens, _)) = result.unwrap();
-
-        let tokens = tokens.iter().filter(|t| match t { Token::WhiteSpace => false, _ => true }).collect::<Vec<&Token>>();
-        
-        assert_eq!(tokens, expected, "Identifiers were not parsed correctly");
+        assert_eq!(token, Token::Period, "Token not period");
     }
 
 
 }
+
+/*fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+
+
+
+    
+
+
+}*/
+
+
+
+
