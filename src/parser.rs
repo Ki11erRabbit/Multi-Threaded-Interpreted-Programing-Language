@@ -171,10 +171,10 @@ fn operators() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let operator = recursive(|op| {
         choice((
+            just(":=").to(Token::MutableAssignment).padded(),
             just("=").to(Token::Assignment).padded(),
             just(":").to(Token::Colon).padded(),
             just(".").to(Token::Period),
-            just(":=").to(Token::MutableAssignment).padded(),
             just("@").to(Token::Attribute).padded(),
             just("_").to(Token::WildCard).padded(),
             ))
@@ -202,6 +202,19 @@ mod operator_tests {
         let token = result.unwrap();
 
         assert_eq!(token, Token::Assignment, "Token not assignment");
+    }
+    #[test]
+    fn test_mut_assignment() {
+        let result = operators().parse(":=");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing mutable assignment");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::MutableAssignment, "Token not mutable assignment");
     }
 
     #[test]
@@ -294,7 +307,219 @@ mod symbol_tests {
             assert!(false, "Parser should have failed");
         }
     }
+}
 
+
+fn numbers() -> impl Parser<char, Token, Error = Simple<char>> {
+
+    let dec = text::int(10).map(|i: String| i);
+    let hex = text::int(16).map(|i: String| i);
+    let oct = text::int(8).map(|i: String| i);
+    let bin = text::int(2).map(|i: String| i);
+
+    let sign = choice((
+        just("+").to("+"),
+        just("-").to("-"),
+        just("").to(""),
+    ));
+
+    let hex_prefix = choice((
+        just("0x").to("0x"),
+        just("0X").to("0x"),
+    ));
+
+    let oct_prefix = choice((
+        just("0o").to("0o"),
+        just("0O").to("0o"),
+    ));
+
+    let bin_prefix = choice((
+        just("0b").to("0b"),
+        just("0B").to("0b"),
+    ));
+
+    let int_suffix = choice((
+        just("i").to("i"),
+        just("I").to("i"),
+        just("u").to("u"),
+        just("U").to("u"),
+        just("f").to("f"),//converts to float
+        just("F").to("f"),//converts to float
+        just("").to(""),
+    ));
+
+    let dec_point = just(".").to(".");
+    let exp_mark = choice((just("e").to("e"), just("E").to("e")));
+
+    let dec_int = sign
+        .then(dec.map(|i| i))
+        .then(int_suffix.map(|s| s))
+        .map(|((s, i), suf)| Token::Number(s.to_owned() + &i + &suf));
+
+    let hex_int = sign
+        .then(hex_prefix.map(|p| p))
+        .then(hex.map(|i| i))
+        .then(int_suffix.map(|s| s))
+        .map(|(((s, p), i), suf)| Token::Number(s.to_owned() + &p + &i + &suf));
+
+    let oct_int = sign
+        .then(oct_prefix.map(|p| p))
+        .then(oct.map(|i| i))
+        .then(int_suffix.map(|s| s))
+        .map(|(((s, p), i), suf)| Token::Number(s.to_owned() + &p + &i + &suf));
+
+    let bin_int = sign
+        .then(bin_prefix.map(|p| p))
+        .then(bin.map(|i| i))
+        .then(int_suffix.map(|s| s))
+        .map(|(((s, p), i), suf)| Token::Number(s.to_owned() + &p + &i + &suf));
+
+    let integer = choice((hex_int, oct_int, bin_int, dec_int));
+    
+    let exp = exp_mark
+        .then(sign.map(|s| s))
+        .then(dec.map(|i| i))
+        .map(|((e, s), i)| e.to_owned() + &s + &i);
+
+    let float_exp = sign
+        .then(dec.map(|i| i))
+        .then(dec_point.map(|p| p.to_string()))
+        .then(dec.map(|i| i))
+        .then(exp.map(|e| e))
+        .map(|((((s, i), p), i2), e)| Token::Number(s.to_owned() + &i + &p + &i2 + &e));
+
+
+    let float_wo_exp = sign
+        .then(dec.map(|i| i))
+        .then(dec_point.map(|p| p.to_string()))
+        .then(dec.map(|i| i))
+        .map(|((((s, i), p), i2))| Token::Number(s.to_owned() + &i + &p + &i2));
+
+    let float = choice((float_exp, float_wo_exp));
+        
+
+    let number = choice((float, integer)).padded();
+
+        
+    number
+}
+
+
+#[cfg(test)]
+mod number_tests {
+    use super::*;
+
+    #[test]
+    fn test_dec() {
+        let result = numbers().parse("123");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing decimal");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("123".to_string()), "Token not decimal");
+    }
+
+    #[test]
+    fn test_hex() {
+        let result = numbers().parse("0x1aF");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing hex");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("0x1aF".to_string()), "Token not hex");
+    }
+
+    #[test]
+    fn test_octal() {
+        let result = numbers().parse("0o123");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing octal");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("0o123".to_string()), "Token not octal");
+    }
+
+    #[test]
+    fn test_binary() {
+        let result = numbers().parse("0b101");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing binary");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("0b101".to_string()), "Token not binary");
+    }
+
+    #[test]
+    fn test_float() {
+        let result = numbers().parse("123.456");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing float");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("123.456".to_string()), "Token not float");
+    }
+
+    #[test]
+    fn test_float_exp() {
+        let result = numbers().parse("123.456e-10");
+        
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing float with exp");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("123.456e-10".to_string()), "Token not float with exp");
+    }
+
+    #[test]
+    fn test_padded_number() {
+        let result = numbers().parse(" 123.456e-10 ");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing padded number");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("123.456e-10".to_string()), "Token not padded number");
+    }
+
+    #[test]
+    fn test_integer_suffix() {
+        let result = numbers().parse("123i");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing integer suffix");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Number("123i".to_string()), "Token not integer suffix");
+    }
 }
 
 /*fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
