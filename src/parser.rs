@@ -715,7 +715,7 @@ mod literal_tests {
 fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789");
-    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:=");
+    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
 
     let cant_be = choice((
         just(":="),
@@ -723,6 +723,7 @@ fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         just("->"),
         just("=>"),
         just("."),
+        just("="),
         ));
 
     let special_identifiers = choice((
@@ -732,6 +733,9 @@ fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         just("con{}").map(|s| s.to_string()),
         just("add:").map(|s| s.to_string()),
         just("remove:").map(|s| s.to_string()),
+        just("..").map(|s| s.to_string()),
+        just("...").map(|s| s.to_string()),
+        just("..=").map(|s| s.to_string()),
     ));
 
     let normal = cant_start_with
