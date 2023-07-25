@@ -522,6 +522,50 @@ mod number_tests {
     }
 }
 
+fn strings() -> impl Parser<char, Token, Error = Simple<char>> {
+    let string = just('\"')
+        .ignore_then(none_of("\"").repeated())
+        .then_ignore(one_of("\""))
+        .then_ignore(end())
+        .map(|s| Token::String(s.iter().collect()));
+
+    string.padded()
+}
+
+#[cfg(test)]
+mod string_tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_string() {
+        let result = strings().parse("\"Hello World\"");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing basic string");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::String("Hello World".to_string()), "Token not basic string");
+    }
+
+    #[test]
+    fn test_escaped_string() {
+        let result = strings().parse("\"Hello \\\"World\\\"\"");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing escaped string");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::String("Hello \"World\"".to_string()), "Token not escaped string");
+    }
+
+}
+
 /*fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
 
 
