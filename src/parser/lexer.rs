@@ -5,7 +5,7 @@ use chumsky::prelude::*;
 //TODO: Change String to &str
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    WhiteSpace,
+    WhiteSpace(String),
     Number(String),
     String(String),
     Char(char),
@@ -26,7 +26,7 @@ pub enum Token {
     Namespace, // ::
     Period, // .
     WildCard, // _
-    Comment,
+    Comment(String),
     MatchArm, // =>
     FunctionReturn, // ->
     Class,
@@ -60,30 +60,30 @@ pub fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let keyword = recursive(|kwd| {
         
-        let class = text::keyword::<_, _, Simple<char>>("class").map(|_| Token::Class).padded();
-        let instance = text::keyword::<_, _, Simple<char>>("instance").map(|_| Token::Instance).padded();
-        let default = text::keyword::<_, _, Simple<char>>("default").map(|_| Token::Default).padded();
-        let sum = text::keyword::<_, _, Simple<char>>("sum").map(|_| Token::Sum).padded();
-        let product = text::keyword::<_, _, Simple<char>>("product").map(|_| Token::Product).padded();
-        let type_ = text::keyword::<_, _, Simple<char>>("type").map(|_| Token::Type).padded();
-        let function = text::keyword::<_, _, Simple<char>>("fn").map(|_| Token::Function).padded();
-        let match_ = text::keyword::<_, _, Simple<char>>("match").map(|_| Token::Match).padded();
-        let while_ = text::keyword::<_, _, Simple<char>>("while").map(|_| Token::While).padded();
-        let elwhile = text::keyword::<_, _, Simple<char>>("elwhile").map(|_| Token::ElWhile).padded();
-        let for_ = text::keyword::<_, _, Simple<char>>("for").map(|_| Token::For).padded();
-        let loop_ = text::keyword::<_, _, Simple<char>>("loop").map(|_| Token::Loop).padded();
-        let if_ = text::keyword::<_, _, Simple<char>>("if").map(|_| Token::If).padded();
-        let elif = text::keyword::<_, _, Simple<char>>("elif").map(|_| Token::Elif).padded();
-        let else_ = text::keyword::<_, _, Simple<char>>("else").map(|_| Token::Else).padded();
-        let continue_ = text::keyword::<_, _, Simple<char>>("continue").map(|_| Token::Continue).padded();
-        let break_ = text::keyword::<_, _, Simple<char>>("break").map(|_| Token::Break).padded();
-        let in_ = text::keyword::<_, _, Simple<char>>("in").map(|_| Token::In).padded();
-        let typeis = text::keyword::<_, _, Simple<char>>("typeis").map(|_| Token::Typeis).padded();
-        let effect = text::keyword::<_, _, Simple<char>>("effect").map(|_| Token::Effect).padded();
-        let with = text::keyword::<_, _, Simple<char>>("with").map(|_| Token::With).padded();
-        let return_ = text::keyword::<_, _, Simple<char>>("return").map(|_| Token::Return).padded();
-        let mod_ = text::keyword::<_, _, Simple<char>>("mod").map(|_| Token::Mod).padded();
-        let import = text::keyword::<_, _, Simple<char>>("import").map(|_| Token::Import).padded();
+        let class = text::keyword::<_, _, Simple<char>>("class").map(|_| Token::Class);
+        let instance = text::keyword::<_, _, Simple<char>>("instance").map(|_| Token::Instance);
+        let default = text::keyword::<_, _, Simple<char>>("default").map(|_| Token::Default);
+        let sum = text::keyword::<_, _, Simple<char>>("sum").map(|_| Token::Sum);
+        let product = text::keyword::<_, _, Simple<char>>("product").map(|_| Token::Product);
+        let type_ = text::keyword::<_, _, Simple<char>>("type").map(|_| Token::Type);
+        let function = text::keyword::<_, _, Simple<char>>("fn").map(|_| Token::Function);
+        let match_ = text::keyword::<_, _, Simple<char>>("match").map(|_| Token::Match);
+        let while_ = text::keyword::<_, _, Simple<char>>("while").map(|_| Token::While);
+        let elwhile = text::keyword::<_, _, Simple<char>>("elwhile").map(|_| Token::ElWhile);
+        let for_ = text::keyword::<_, _, Simple<char>>("for").map(|_| Token::For);
+        let loop_ = text::keyword::<_, _, Simple<char>>("loop").map(|_| Token::Loop);
+        let if_ = text::keyword::<_, _, Simple<char>>("if").map(|_| Token::If);
+        let elif = text::keyword::<_, _, Simple<char>>("elif").map(|_| Token::Elif);
+        let else_ = text::keyword::<_, _, Simple<char>>("else").map(|_| Token::Else);
+        let continue_ = text::keyword::<_, _, Simple<char>>("continue").map(|_| Token::Continue);
+        let break_ = text::keyword::<_, _, Simple<char>>("break").map(|_| Token::Break);
+        let in_ = text::keyword::<_, _, Simple<char>>("in").map(|_| Token::In);
+        let typeis = text::keyword::<_, _, Simple<char>>("typeis").map(|_| Token::Typeis);
+        let effect = text::keyword::<_, _, Simple<char>>("effect").map(|_| Token::Effect);
+        let with = text::keyword::<_, _, Simple<char>>("with").map(|_| Token::With);
+        let return_ = text::keyword::<_, _, Simple<char>>("return").map(|_| Token::Return);
+        let mod_ = text::keyword::<_, _, Simple<char>>("mod").map(|_| Token::Mod);
+        let import = text::keyword::<_, _, Simple<char>>("import").map(|_| Token::Import);
 
         choice((class
            ,instance
@@ -168,12 +168,12 @@ pub fn operators() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let operator = recursive(|op| {
         choice((
-            just(":=").to(Token::MutableAssignment).padded(),
-            just("=").to(Token::Assignment).padded(),
-            just(":").to(Token::Colon).padded(),
+            just(":=").to(Token::MutableAssignment),
+            just("=").to(Token::Assignment),
+            just(":").to(Token::Colon),
             just(".").to(Token::Period),
-            just("@").to(Token::Attribute).padded(),
-            just("_").to(Token::WildCard).padded(),
+            just("@").to(Token::Attribute),
+            just("_").to(Token::WildCard),
             ))
     });
 
@@ -258,16 +258,16 @@ pub fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let symbol = recursive(|sym| {
         choice((
-            just("[").to(Token::BracketLeft).padded(),
-            just("]").to(Token::BracketRight).padded(),
-            just("(").to(Token::ParenLeft).padded(),
-            just(")").to(Token::ParenRight).padded(),
-            just("{").to(Token::CurlyLeft).padded(),
-            just("}").to(Token::CurlyRight).padded(),
-            just(",").to(Token::Comma).padded(),
-            just(";").to(Token::Semicolon).padded(),
-            just("->").to(Token::FunctionReturn).padded(),
-            just("=>").to(Token::MatchArm).padded(),
+            just("[").to(Token::BracketLeft),
+            just("]").to(Token::BracketRight),
+            just("(").to(Token::ParenLeft),
+            just(")").to(Token::ParenRight),
+            just("{").to(Token::CurlyLeft),
+            just("}").to(Token::CurlyRight),
+            just(",").to(Token::Comma),
+            just(";").to(Token::Semicolon),
+            just("->").to(Token::FunctionReturn),
+            just("=>").to(Token::MatchArm),
             just("::").to(Token::Namespace),
             ))
     });
@@ -395,7 +395,7 @@ fn numbers() -> impl Parser<char, Token, Error = Simple<char>> {
     let float = choice((float_exp, float_wo_exp));
         
 
-    let number = choice((float, integer)).padded();
+    let number = choice((float, integer));
 
         
     number
@@ -490,19 +490,6 @@ mod number_tests {
         assert_eq!(token, Token::Number("123.456e-10".to_string()), "Token not float with exp");
     }
 
-    #[test]
-    fn test_padded_number() {
-        let result = numbers().parse(" 123.456e-10 ");
-
-        if result.is_err() {
-            eprintln!("{:?}", result);
-            assert!(false, "Error parsing padded number");
-        }
-
-        let token = result.unwrap();
-
-        assert_eq!(token, Token::Number("123.456e-10".to_string()), "Token not padded number");
-    }
 
     #[test]
     fn test_integer_suffix() {
@@ -543,7 +530,7 @@ fn strings() -> impl Parser<char, Token, Error = Simple<char>> {
         .map(|s| Token::String(s.iter().collect()));
     
 
-    string.padded()
+    string
 }
 
 #[cfg(test)]
@@ -618,7 +605,7 @@ fn chars() -> impl Parser<char, Token, Error = Simple<char>> {
         .map(|s| Token::Char(s));
     
 
-    char_.padded()
+    char_
 }
 
 #[cfg(test)]
@@ -754,7 +741,7 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         
     
 
-    identifier.padded()
+    identifier
 }
 
 #[cfg(test)]
@@ -867,14 +854,119 @@ mod identifier_tests {
 
 }
 
-/*fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+
+pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
+    
+    let line_comment = just("//")
+        .then(none_of("\r\n").repeated())
+        .map(|(lm, s)| lm.to_string() + &s.iter().collect::<String>());
+
+    let block_comment = just("/*")
+        .then(none_of("*/").repeated())
+        .then(just("*/"))
+        .map(|((st, s), end)| st.to_string() + &s.iter().collect::<String>() + end);
+
+    let comment = choice((
+        line_comment,
+        block_comment,
+    ));
+    
+    
+    let whitespace = one_of(" \n\t\r").repeated().map(|_| "".to_string());
+    
+    let token = recursive(|_| {
+        choice((
+            comment.map(|s| Token::Comment(s)),
+            whitespace.map(|s| Token::WhiteSpace(s)),
+            identifiers(),
+            literals(),
+            symbols(),
+        ))});
+    
+    token.repeated()
+    
+}
 
 
+#[cfg(test)]
+mod lexer_tests {
+    use super::*;
+
+    #[test]
+    fn test_line_comment() {
+        let result = lexer().parse("// hello world");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing line comment");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::Comment("// hello world".to_string())], "Token not line comment");
+    }
+
+    #[test]
+    fn test_block_comment() {
+        let result = lexer().parse("/* hello world */");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing block comment");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::Comment("/* hello world */".to_string())], "Token not block comment");
+    }
+
+    #[test]
+    fn test_whitespace() {
+        let result = lexer().parse(" \n\t\r");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing whitespace");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::WhiteSpace(" \n\t\r".to_string())], "Token not whitespace");
+    }
+
+    #[test]
+    fn test_assignment() {
+        let result = lexer().parse("a = 1");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing assignment");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::Identifier("a".to_string()), Token::WhiteSpace(" ".to_string()), Token::Assignment, Token::WhiteSpace(" ".to_string()), Token::Number("1".to_string())], "Token not assignment");
+    }
+
+    #[test]
+    fn test_type_class() {
+        let result = lexer().parse("class Monad m { fn (>>=)(m a, fn (a) -> m b) -> m b }");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing type class");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::Class, Token::WhiteSpace(" ".to_string()), Token::Identifier("Monad".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::CurlyLeft, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("a".to_string()), Token::Comma, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::CurlyRight], "Token not type class");
+    }
+    
 
     
 
+}
 
-}*/
 
 
 
