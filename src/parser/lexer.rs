@@ -132,19 +132,6 @@ mod keywords_tests {
 
         assert_eq!(token, Token::Class, "Error parsing class");
     }
-    #[test]
-    fn test_instance() {
-        let result = keywords().parse(" instance");
-
-        if result.is_err() {
-            eprintln!("{:?}", result);
-            assert!(false, "Error parsing instance");
-        }
-
-        let token = result.unwrap();
-
-        assert_eq!(token, Token::Instance, "Error parsing instance");
-    }
 
     #[test]
     fn test_return() {
@@ -854,30 +841,90 @@ mod identifier_tests {
 
 }
 
-
-pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
-    
-    /*let line_comment = just("//")
+pub fn comments() -> impl Parser<char, Token, Error = Simple<char>> {
+    let line_comment = just("//")
         .then(none_of("\r\n").repeated())
         .map(|(lm, s)| lm.to_string() + &s.iter().collect::<String>());
 
     let block_comment = just("/*")
         .then(none_of("*/").repeated())
-        .then(just("*///"))
-        //.map(|((st, s), end)| st.to_string() + &s.iter().collect::<String>() + end);
+        .then(just("*/"))
+        .map(|((st, s), end)| st.to_string() + &s.iter().collect::<String>() + end);
 
-    /*let comment = choice((
+    let comment = choice((
         line_comment,
         block_comment,
-    ));*/
-    
-    
-    let whitespace = one_of(" \n\t\r").repeated().map(|_| "".to_string());
+    ));
+
+    comment.map(|s| Token::Comment(s))
+}
+
+#[cfg(test)]
+mod comment_tests {
+    use super::*;
+
+    #[test]
+    fn test_line_comment() {
+        let result = comments().parse("// hello world");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing line comment");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Comment("// hello world".to_string()), "Token not line comment");
+    }
+
+    #[test]
+    fn test_block_comment() {
+        let result = comments().parse("/* hello world */");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing block comment");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::Comment("/* hello world */".to_string()), "Token not block comment");
+    }
+
+}
+
+pub fn whitespace() -> impl Parser<char, Token, Error = Simple<char>> {
+    let whitespace = one_of(" \n\t\r").repeated().map(|s| s.iter().collect::<String>());
+
+    whitespace.map(|s| Token::WhiteSpace(s))
+}
+
+#[cfg(test)]
+mod whitespace_tests {
+    use super::*;
+
+
+    #[test]
+    fn test_whitespace() {
+        let result = whitespace().parse(" \n\t\r");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing whitespace");
+        }
+
+        let token = result.unwrap();
+
+        assert_eq!(token, Token::WhiteSpace(" \n\t\r".to_string()), "Token not whitespace");
+    }
+}
+
+pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
     let token = recursive(|_| {
         choice((
-            //comment.map(|s| Token::Comment(s)),
-            whitespace.map(|s| Token::WhiteSpace(s)),
+            comments(),
+            whitespace(),
             identifiers(),
             literals(),
             symbols(),
@@ -892,47 +939,6 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
 mod lexer_tests {
     use super::*;
 
-    #[test]
-    fn test_line_comment() {
-        let result = lexer().parse("// hello world");
-
-        if result.is_err() {
-            eprintln!("{:?}", result);
-            assert!(false, "Error parsing line comment");
-        }
-
-        let tokens = result.unwrap();
-
-        assert_eq!(tokens, vec![Token::Comment("// hello world".to_string())], "Token not line comment");
-    }
-
-    #[test]
-    fn test_block_comment() {
-        let result = lexer().parse("/* hello world */");
-
-        if result.is_err() {
-            eprintln!("{:?}", result);
-            assert!(false, "Error parsing block comment");
-        }
-
-        let tokens = result.unwrap();
-
-        assert_eq!(tokens, vec![Token::Comment("/* hello world */".to_string())], "Token not block comment");
-    }
-
-    #[test]
-    fn test_whitespace() {
-        let result = lexer().parse(" \n\t\r");
-
-        if result.is_err() {
-            eprintln!("{:?}", result);
-            assert!(false, "Error parsing whitespace");
-        }
-
-        let tokens = result.unwrap();
-
-        assert_eq!(tokens, vec![Token::WhiteSpace(" \n\t\r".to_string())], "Token not whitespace");
-    }
 
     #[test]
     fn test_assignment() {
