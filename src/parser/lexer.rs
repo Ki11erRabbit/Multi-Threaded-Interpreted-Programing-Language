@@ -923,6 +923,7 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
     let token = recursive(|_| {
         choice((
+            keywords(),
             comments(),
             whitespace(),
             identifiers(),
