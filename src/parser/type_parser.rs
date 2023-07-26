@@ -2,19 +2,68 @@ use chumsky::prelude::*;
 
 use crate::parser::symbols_parser::identifiers;
 
+use std::fmt;
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     WithTypeList {
         name: String,
         parameters: Vec<Type>,
     },
     Function {
-        parameters: Vec<(Type)>,
+        parameters: Vec<Type>,
         effects: Vec<Type>,
         return_type: Box<Type>,
     },
     SingleType(String),
     Tuple(Vec<Type>),
 }
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::SingleType(name) => write!(f, "{}", name),
+            Type::Tuple(types) => {
+                let output = String::new();
+                let mut output = output + "(";
+                for t in types {
+                    output += &format!("{}, ", t);
+                }
+                output.pop();
+                output.pop();
+                output += ")";
+                write!(f, "{}", output)
+            },
+            Type::Function{parameters, effects, return_type} => {
+                let mut output = "fn(".to_string();
+
+                for p in parameters {
+                    output += &format!("{}, ", p);
+                }
+                output.pop();
+                output.pop();
+                output += ")";
+                for e in effects {
+                    output += &format!("{} ", e);
+                }
+                output += "-> ";
+                output += &format!("{}", return_type);
+                write!(f, "{}", output)
+            },
+            Type::WithTypeList{name, parameters} => {
+                let mut output = format!("({}", name);
+                for p in parameters {
+                    output += &format!(" {}", p);
+                }
+                output += ")";
+                write!(f, "{}", output)
+            }
+            
+        }
+    }
+
+}
+
 
 /// This function parses something like this (List a) or (List (a, b, c))
 /// Or (Hashmap a b)
@@ -104,9 +153,47 @@ fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
 
     let type_group = parse_type_group();
 
+    let tuple_or_type_group = recursive(|t| t
+                                        .separated_by(just(',').padded())
+                                        .delimited_by(just('(').padded(), just(')').padded())
+                                        .then(tuple)
+                                        .map(|(tuple, _)| Type::Tuple(tuple))
+                                        .or(type_group)
+                                        .map(|type_group| type_group));
+
 
     let function = parse_function();
 
-    choice((single_type, tuple, type_group, function))
+    let tree = recursive(|tree| tree
+                         .separated_by(one_of(", ").padded())
+                         .delimited_by(just('(').padded(), just(')').padded())
+                         .then(tuple_or_type_group
+                            .map(|type_group| vec![type_group]))
+                         .or(single_type
+                            .map(|single_type| vec![single_type])));
+
+    tree
+}
+
+
+#[cfg(test)]
+mod type_parse_tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_type() {
+        let result = parse_type().parse("Int");
+
+        if result.is_err() {
+            println!("{:?}", result);
+            assert!(false, "Failure to parse simple type: Int");
+        }
+
+        let int = result.unwrap();
+        
+        assert_eq!(int, Type::SingleType("Int".to_string()));
+
+    }
+
 
 }
