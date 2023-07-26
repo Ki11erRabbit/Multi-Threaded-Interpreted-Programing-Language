@@ -227,8 +227,22 @@ mod type_parse_tests {
 
         assert_eq!(list_list_string, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![ Type::TypeList { name : Box::new(Type::SingleType("List".to_string())), parameters: vec![ Type::SingleType("String".to_string())]}]}, "Nested Type List doesn't match");
     }
-            
-        
 
+
+    #[test]
+    fn test_long_type_list() {
+        
+        let result = parse_type().parse("(List String a b c)");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: (List String a b c)");
+        }
+
+        let list_string = result.unwrap();
+
+        assert_eq!(list_string, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![Type::SingleType("String".to_string()), Type::SingleType("a".to_string()), Type::SingleType("b".to_string()), Type::SingleType("c".to_string())] });
+        
+    }
 
 }
