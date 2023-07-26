@@ -742,7 +742,7 @@ mod literal_tests {
 
 pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
 
-    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789");
+    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:");
     let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
 
     let cant_be = choice((
@@ -766,15 +766,15 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         just("..=").map(|s| s.to_string()),
     ));
 
+
     let normal = cant_start_with
         .then(cant_contain.repeated())
         .map(|(c, s)| format!("{}{}", c, s.iter().collect::<String>()));
 
-    let basic_identifier = recursive(|identifier| {
+    let basic_identifier = 
         cant_be.not()
             .then(normal)
-            .map(|(c,s)| {c.to_string() + &s})
-    });
+            .map(|(c,s)| {c.to_string() + &s});
 
     let identifier = choice((
         special_identifiers,
@@ -896,6 +896,16 @@ mod identifier_tests {
         assert_eq!(token, Token::Identifier("..".to_string()), "Token not edge case");
     }
 
+    #[test]
+    fn test_weird_edge_case() {
+        let result = identifiers().parse("a = 1");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing weird edge case");
+        }
+    }
+
 }
 
 pub fn comments() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -951,9 +961,16 @@ mod comment_tests {
 }
 
 pub fn whitespace() -> impl Parser<char, Token, Error = Simple<char>> {
-    let whitespace = one_of(" \n\t\r").repeated().map(|s| s.iter().collect::<String>());
+    //let whitespace = one_of(" \n\t\r").repeated().map(|s| s.iter().collect::<String>());
 
-    whitespace.map(|s| Token::WhiteSpace(s))
+    let whitespace = choice((
+        just(" "),
+        just("\n"),
+        just("\t"),
+        just("\r"),
+    ));
+
+    whitespace.map(|s| Token::WhiteSpace(s.to_string()))
 }
 
 #[cfg(test)]
@@ -979,14 +996,15 @@ mod whitespace_tests {
 pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
     let token = choice((
-            keywords(),
-            identifiers(),
-            whitespace(),
+        keywords(),
+        identifiers(),
+        whitespace(),
         symbols(),
         operators(),
-            literals(),
-            comments(),
-        ));
+        literals(),
+        comments(),
+    ));
+
     
     token.repeated().then_ignore(end())
     
