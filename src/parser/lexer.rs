@@ -742,18 +742,22 @@ mod literal_tests {
 
 pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
 
-    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:");
-    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
 
-    let cant_be = choice((
+
+
+    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:=");
+    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:=");
+
+    /*let cant_be = choice((
         just(":="),
         just("::"),
         just("->"),
         just("=>"),
         just("."),
         just("="),
-        ));
+        ));*/
 
+    //these handle weird edge cases in the parser
     let special_identifiers = choice((
         just("get[]").map(|s| s.to_string()),
         just("set[]").map(|s| s.to_string()),
@@ -764,6 +768,11 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         just("..").map(|s| s.to_string()),
         just("...").map(|s| s.to_string()),
         just("..=").map(|s| s.to_string()),
+        just("==").map(|s| s.to_string()),
+        just("!=").map(|s| s.to_string()),
+        just("<=").map(|s| s.to_string()),
+        just(">=").map(|s| s.to_string()),
+        just(">>=").map(|s| s.to_string()),
     ));
 
 
@@ -771,14 +780,14 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         .then(cant_contain.repeated())
         .map(|(c, s)| format!("{}{}", c, s.iter().collect::<String>()));
 
-    let basic_identifier = 
+    /*let basic_identifier = 
         cant_be.not()
             .then(normal)
-            .map(|(c,s)| {c.to_string() + &s});
+            .map(|(c,s)| {c.to_string() + &s});*/
 
     let identifier = choice((
         special_identifiers,
-        basic_identifier,
+        normal,
     ))
     .map(|s| Token::Identifier(s));
         
@@ -898,11 +907,11 @@ mod identifier_tests {
 
     #[test]
     fn test_weird_edge_case() {
-        let result = identifiers().parse("a = 1");
+        let result = identifiers().parse(" a = 1");
 
-        if result.is_err() {
+        if result.is_ok() {
             eprintln!("{:?}", result);
-            assert!(false, "Error parsing weird edge case");
+            assert!(false, "Parsed weird edge case");
         }
     }
 
@@ -980,7 +989,7 @@ mod whitespace_tests {
 
     #[test]
     fn test_whitespace() {
-        let result = whitespace().parse(" \n\t\r");
+        let result = whitespace().parse(" ");
 
         if result.is_err() {
             eprintln!("{:?}", result);
@@ -989,7 +998,7 @@ mod whitespace_tests {
 
         let token = result.unwrap();
 
-        assert_eq!(token, Token::WhiteSpace(" \n\t\r".to_string()), "Token not whitespace");
+        assert_eq!(token, Token::WhiteSpace(" ".to_string()), "Token not whitespace");
     }
 }
 
@@ -997,12 +1006,12 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
     let token = choice((
         keywords(),
-        identifiers(),
-        whitespace(),
         symbols(),
         operators(),
+        whitespace(),
         literals(),
         comments(),
+        identifiers(),
     ));
 
     
@@ -1041,7 +1050,7 @@ mod lexer_tests {
 
         let tokens = result.unwrap();
 
-        assert_eq!(tokens, vec![Token::Class, Token::WhiteSpace(" ".to_string()), Token::Identifier("Monad".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::CurlyLeft, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("a".to_string()), Token::Comma, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::CurlyRight], "Token not type class");
+        assert_eq!(tokens, vec![Token::Class, Token::WhiteSpace(" ".to_string()), Token::Identifier("Monad".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::CurlyLeft, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("a".to_string()), Token::Comma, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::WhiteSpace(" ".to_string()), Token::CurlyRight], "Token not type class");
     }
     
 
