@@ -6,8 +6,8 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    WithTypeList {
-        name: String,
+    TypeList {
+        name: Box<Type>,
         parameters: Vec<Type>,
     },
     Function {
@@ -50,7 +50,7 @@ impl fmt::Display for Type {
                 output += &format!("{}", return_type);
                 write!(f, "{}", output)
             },
-            Type::WithTypeList{name, parameters} => {
+            Type::TypeList{name, parameters} => {
                 let mut output = format!("({}", name);
                 for p in parameters {
                     output += &format!(" {}", p);
@@ -64,23 +64,26 @@ impl fmt::Display for Type {
 
 }
 
-
+/*
 /// This function parses something like this (List a) or (List (a, b, c))
 /// Or (Hashmap a b)
 fn parse_type_group() -> impl Parser<char, Type, Error = Simple<char>> {
 
     let identifier = identifiers();
 
-    let type_group = just('(')
+    /*let type_group = just('(')
         .ignore_then(identifier).padded()
         .then(parse_type().padded().repeated())
         .then_ignore(just(')'))
-        .map(|(name, parameters)| Type::WithTypeList { name, parameters });
+        .map(|(name, parameters)| Type::WithTypeList { name, parameters });*/
 
+    let type_group = identifier.padded()
+        .then(parse_type().padded().repeated())
+        .map(|(name, parameters)| Type::TypeList { name, parameters });
 
     type_group
 
-}
+}*/
 
 /// This function parses something like this (a, b, c) or ()
 fn parse_tuple() -> impl Parser<char, Type, Error = Simple<char>> {
@@ -146,12 +149,13 @@ fn parse_function() -> impl Parser<char, Type, Error = Simple<char>> {
 /// fn(a, b, c) exn -> Int
 fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
 
-    let single_type = identifiers()
+    /*let single_type = identifiers()
         .map(|name| Type::SingleType(name));
 
-    let tuple = parse_tuple();
+    let type_group = parse_type_group()
+        .map(|type_group| type_group);*/
+    /*let tuple = parse_tuple();
 
-    let type_group = parse_type_group();
 
     let tuple_or_type_group = recursive(|t| t
                                         .separated_by(just(',').padded())
@@ -162,17 +166,18 @@ fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
                                         .map(|type_group| type_group));
 
 
-    let function = parse_function();
+    let function = parse_function();*/
 
-    let tree = recursive(|tree| tree
-                         .separated_by(one_of(", ").padded())
-                         .delimited_by(just('(').padded(), just(')').padded())
-                         .then(tuple_or_type_group
-                            .map(|type_group| vec![type_group]))
-                         .or(single_type
-                            .map(|single_type| vec![single_type])));
+    let single_or_group:Recursive<char, Type, Simple<char>> = recursive(|sog: chumsky::recursive::Recursive<'_, char, Type, Simple<char>>| sog
+                                    .separated_by(just(' '))
+                                    .delimited_by(just('(').padded(), just(')').padded())
+                                    .map(|vec| Type::TypeList { name: Box::new(vec[0].clone()), parameters: vec[1..].to_vec() })
+                                    .or(identifiers().map(Type::SingleType))
+                                    
 
-    tree
+    );
+
+    single_or_group
 }
 
 
@@ -185,7 +190,7 @@ mod type_parse_tests {
         let result = parse_type().parse("Int");
 
         if result.is_err() {
-            println!("{:?}", result);
+            eprintln!("{:?}", result);
             assert!(false, "Failure to parse simple type: Int");
         }
 
@@ -194,6 +199,36 @@ mod type_parse_tests {
         assert_eq!(int, Type::SingleType("Int".to_string()));
 
     }
+
+    #[test]
+    fn test_type_list() {
+        let result = parse_type().parse("(List String)");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: (List String)");
+        }
+
+        let list_string = result.unwrap();
+
+        assert_eq!(list_string, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![Type::SingleType("String".to_string())] });
+    }
+
+    #[test]
+    fn test_nested_type_list() {
+        let result = parse_type().parse("(List (List String))");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: (List (List String))");
+        }
+
+        let list_list_string = result.unwrap();
+
+        assert_eq!(list_list_string, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![ Type::TypeList { name : Box::new(Type::SingleType("List".to_string())), parameters: vec![ Type::SingleType("String".to_string())]}]}, "Nested Type List doesn't match");
+    }
+            
+        
 
 
 }
