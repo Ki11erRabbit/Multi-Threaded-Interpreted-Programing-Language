@@ -109,6 +109,81 @@ pub fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
     keyword
 }
 
+pub fn keyword_class() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("class").map(|_| "class".to_string())
+}
+pub fn keyword_instance() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("instance").map(|_| "instance".to_string())
+}
+pub fn keyword_default() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("default").map(|_| "default".to_string())
+}
+pub fn keyword_sum() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("sum").map(|_| "sum".to_string())
+}
+pub fn keyword_product() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("product").map(|_| "product".to_string())
+}
+pub fn keyword_type() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("type").map(|_| "type".to_string())
+}
+pub fn keyword_function() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("fn").map(|_| "fn".to_string())
+}
+pub fn keyword_match() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("match").map(|_| "match".to_string())
+}
+pub fn keyword_while() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("while").map(|_| "while".to_string())
+}
+pub fn keyword_elwhile() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("elwhile").map(|_| "elwhile".to_string())
+}
+pub fn keyword_for() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("for").map(|_| "for".to_string())
+}
+pub fn keyword_loop() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("loop").map(|_| "loop".to_string())
+}
+pub fn keyword_if() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("if").map(|_| "if".to_string())
+}
+pub fn keyword_elif() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("elif").map(|_| "elif".to_string())
+}
+pub fn keyword_else() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("else").map(|_| "else".to_string())
+}
+pub fn keyword_continue() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("continue").map(|_| "continue".to_string())
+}
+pub fn keyword_break() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("break").map(|_| "break".to_string())
+}
+pub fn keyword_in() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("in").map(|_| "in".to_string())
+}
+pub fn keyword_typeis() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("typeis").map(|_| "typeis".to_string())
+}
+pub fn keyword_effect() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("effect").map(|_| "effect".to_string())
+}
+pub fn keyword_with() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("with").map(|_| "with".to_string())
+}
+pub fn keyword_return() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("return").map(|_| "return".to_string())
+}
+pub fn keyword_mod() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("mod").map(|_| "mod".to_string())
+}
+pub fn keyword_import() -> impl Parser<char, String, Error = Simple<char>> {
+    text::keyword("import").map(|_| "import".to_string())
+}
+
+
+
 #[cfg(test)]
 mod keywords_tests {
     use super::*;
@@ -162,12 +237,30 @@ pub fn operators() -> impl Parser<char, Token, Error = Simple<char>> {
     operator
 }
 
+pub fn operator_assignment() -> impl Parser<char, String, Error = Simple<char>> {
+    just("=").map(|_| "=".to_string())
+}
+pub fn operator_mutable_assignment() -> impl Parser<char, String, Error = Simple<char>> {
+    just(":=").map(|_| ":=".to_string())
+}
+pub fn operator_colon() -> impl Parser<char, String, Error = Simple<char>> {
+    just(":").map(|_| ":".to_string())
+}
+pub fn operator_period() -> impl Parser<char, String, Error = Simple<char>> {
+    just(".").map(|_| ".".to_string())
+}
+pub fn operator_attribute() -> impl Parser<char, String, Error = Simple<char>> {
+    just("@").map(|_| "@".to_string())
+}
+pub fn operator_wildcard() -> impl Parser<char, String, Error = Simple<char>> {
+    just("_").map(|_| "_".to_string())
+}
+
 
 
 #[cfg(test)]
 mod operator_tests {
     use super::*;
-    use chumsky::prelude::*;
 
     #[test]
     fn test_assignment() {
@@ -233,6 +326,41 @@ mod operator_tests {
             assert!(false, "Parser should have failed");
         }
     }
+}
+
+
+pub fn symbol_bracket_left() -> impl Parser<char, String, Error = Simple<char>> {
+    just("[").map(|_| "[".to_string())
+}
+pub fn symbol_bracket_right() -> impl Parser<char, String, Error = Simple<char>> {
+    just("]").map(|_| "]".to_string())
+}
+pub fn symbol_paren_left() -> impl Parser<char, String, Error = Simple<char>> {
+    just("(").map(|_| "(".to_string())
+}
+pub fn symbol_paren_right() -> impl Parser<char, String, Error = Simple<char>> {
+    just(")").map(|_| ")".to_string())
+}
+pub fn symbol_curly_left() -> impl Parser<char, String, Error = Simple<char>> {
+    just("{").map(|_| "{".to_string())
+}
+pub fn symbol_curly_right() -> impl Parser<char, String, Error = Simple<char>> {
+    just("}").map(|_| "}".to_string())
+}
+pub fn symbol_comma() -> impl Parser<char, String, Error = Simple<char>> {
+    just(",").map(|_| ",".to_string())
+}
+pub fn symbol_semicolon() -> impl Parser<char, String, Error = Simple<char>> {
+    just(";").map(|_| ";".to_string())
+}
+pub fn symbol_function_arrow() -> impl Parser<char, String, Error = Simple<char>> {
+    just("->").map(|_| "->".to_string())
+}
+pub fn symbol_match_arm() -> impl Parser<char, String, Error = Simple<char>> {
+    just("=>").map(|_| "=>".to_string())
+}
+pub fn symbol_namespace() -> impl Parser<char, String, Error = Simple<char>> {
+    just("::").map(|_| "::".to_string())
 }
 
 
@@ -401,15 +529,6 @@ pub fn identifiers() -> impl Parser<char, String, Error = Simple<char>> {
     let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:");
     let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
 
-    /*let cant_be = choice((
-        just(":="),
-        just("::"),
-        just("->"),
-        just("=>"),
-        just("."),
-        just("="),
-        cant_start_with.then(cant_contain.repeated())
-        ));*/
 
     //these handle weird edge cases in the parser
     let special_identifiers = choice((
@@ -439,12 +558,29 @@ pub fn identifiers() -> impl Parser<char, String, Error = Simple<char>> {
             .then(normal)
             .map(|(c,s)| {c.to_string() + &s});*/
 
-    let identifier = choice((
+    let valid_identifier = choice((
         special_identifiers,
         normal,
     ))
-    .map(|s| s);
-        
+        .map(|s| s);
+
+
+    let identifier = select!{
+
+    let identifier = valid_identifier.validate(|s, span, emit| {
+        match s.as_str() {
+            ":=" | "::" | "->" | "." | "=" => {
+                emit(Simple::custom(span, "identifier can't be built in operator".to_string()));
+                s
+            },
+            "class"|"instance"|"default"|"sum"|"product"|"type"|"fn"|"match"| "while"|"elwhile"|"for"|"loop"|"if"|"elif"|"else"|"continue"|"break"|"in"|"typeis"|"effect"|"with"|"return"|"mod"|"import" => {
+                emit(Simple::custom(span, "identifier can't be keyword".to_string()));
+                s
+            },
+            _ => s,
+        }
+    });
+    
         
     
 

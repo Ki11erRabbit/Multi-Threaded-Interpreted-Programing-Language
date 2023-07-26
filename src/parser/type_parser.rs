@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use crate::parser::symbols_parser::identifiers;
+use crate::parser::symbols_parser::{identifiers, keyword_function,symbol_paren_left, symbol_paren_right,symbol_function_arrow};
 
 use std::fmt;
 
@@ -19,7 +19,6 @@ pub enum Type {
     Tuple(Vec<Type>),
 }
 
-type Effects = Vec<Type>;
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -191,26 +190,33 @@ fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
                                                                         .or(tuple_or_single)
     );
 
-    let effects: Recursive<char, Vec<Type>, Simple<char>> = recursive(|eff: chumsky::recursive::Recursive<'_, char, Vec<Type>, Simple<char>>| eff
+    let multiple_effects = single_or_group.clone()
+        .separated_by(just(',').padded());
+    let effect = single_or_group.clone().map(|eff| vec![eff]);
+    let no_effects = just("->").padded().rewind().map(|_| Vec::new());
+
+    let effects = choice((multiple_effects, effect, no_effects));
+    
+    
+    /*let effects: Recursive<char, Vec<Type>, Simple<char>> = recursive(|eff: chumsky::recursive::Recursive<'_, char, Vec<Type>, Simple<char>>| eff
                             .separated_by(just(',').padded())
-                            .delimited_by(just('<').padded(), just('>').padded())
-                            .map(|effects| effects)
-                            .or(single_or_group.map(|single_or_group| vec![single_or_group])));
+                            .map(|effects| effects[0])
+                            .or(single_or_group.map(|single_or_group| vec![vec![single_or_group]])));*/
         
 
-    let function = recursive(|func|
-                             just("fn").padded()
-                             .then(func
-                                   .separated_by(just(',').padded())
-                                   .delimited_by(just('(').padded(), just(')').padded()))
-                                   .then(effects))
-                             .then_ignore(just("->").padded())
-                             .then(single_or_group)
-                             .map(|(((_,parameters), effects), return_type)| Type::Function { parameters, effects, return_type: Box::new(return_type) });
-                                   
+    let function_args = single_or_group.clone()
+        .separated_by(just(',').padded());
+
+    let function = keyword_function().padded()
+        .ignore_then(function_args)
+        .then(effects)
+        .then_ignore(symbol_function_arrow().padded())
+        .then(single_or_group.clone())
+        .map(|((parameters, effects), return_type)| Type::Function { parameters, effects, return_type: Box::new(return_type) });
 
 
-    single_or_group
+
+    single_or_group.recover_with(skip_parser(function))
 }
 
 
@@ -318,6 +324,20 @@ mod type_parse_tests {
         let tuple = result.unwrap();
 
         assert_eq!(tuple, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![Type::Tuple(vec![Type::SingleType("Int".to_string()), Type::SingleType("String".to_string())])]} );
+    }
+
+    #[test]
+    fn test_simple_function_type() {
+        let result = parse_type().parse("fn (Int, String) -> Int");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: fn (Int, String) -> Int");
+        }
+
+        let function = result.unwrap();
+
+        assert_eq!(function, Type::Function { parameters: vec![Type::Tuple(vec![Type::SingleType("Int".to_string()), Type::SingleType("String".to_string())])], effects: Vec::new(), return_type: Box::new(Type::SingleType("Int".to_string())) });
     }
 
         
