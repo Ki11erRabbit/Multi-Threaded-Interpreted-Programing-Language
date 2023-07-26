@@ -19,6 +19,8 @@ pub enum Type {
     Tuple(Vec<Type>),
 }
 
+type Effects = Vec<Type>;
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -149,10 +151,10 @@ fn parse_function() -> impl Parser<char, Type, Error = Simple<char>> {
 /// fn(a, b, c) exn -> Int
 fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
 
-    /*let single_type = identifiers()
+    let single_type = identifiers()
         .map(|name| Type::SingleType(name));
 
-    let type_group = parse_type_group()
+    /*let type_group = parse_type_group()
         .map(|type_group| type_group);*/
     /*let tuple = parse_tuple();
 
@@ -168,14 +170,45 @@ fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
 
     let function = parse_function();*/
 
+    /*let single_or_group:Recursive<char, Type, Simple<char>> = recursive(|sog: chumsky::recursive::Recursive<'_, char, Type, Simple<char>>| sog
+                                    .separated_by(just(' '))
+                                    .delimited_by(just('(').padded(), just(')').padded())
+                                    .map(|vec| Type::TypeList { name: Box::new(vec[0].clone()), parameters: vec[1..].to_vec() })
+                                                                        .or(identifiers().map(Type::SingleType))
+);*/
+
+    let tuple_or_single = recursive(|tuple| tuple
+                                    .separated_by(just(',').padded())
+                                    .delimited_by(just('(').padded(), just(')').padded())
+                                    .map(|tuple| Type::Tuple(tuple))
+                                    .or(single_type)
+    );
+
     let single_or_group:Recursive<char, Type, Simple<char>> = recursive(|sog: chumsky::recursive::Recursive<'_, char, Type, Simple<char>>| sog
                                     .separated_by(just(' '))
                                     .delimited_by(just('(').padded(), just(')').padded())
                                     .map(|vec| Type::TypeList { name: Box::new(vec[0].clone()), parameters: vec[1..].to_vec() })
-                                    .or(identifiers().map(Type::SingleType))
-                                    
-
+                                                                        .or(tuple_or_single)
     );
+
+    let effects: Recursive<char, Vec<Type>, Simple<char>> = recursive(|eff: chumsky::recursive::Recursive<'_, char, Vec<Type>, Simple<char>>| eff
+                            .separated_by(just(',').padded())
+                            .delimited_by(just('<').padded(), just('>').padded())
+                            .map(|effects| effects)
+                            .or(single_or_group.map(|single_or_group| vec![single_or_group])));
+        
+
+    let function = recursive(|func|
+                             just("fn").padded()
+                             .then(func
+                                   .separated_by(just(',').padded())
+                                   .delimited_by(just('(').padded(), just(')').padded()))
+                                   .then(effects))
+                             .then_ignore(just("->").padded())
+                             .then(single_or_group)
+                             .map(|(((_,parameters), effects), return_type)| Type::Function { parameters, effects, return_type: Box::new(return_type) });
+                                   
+
 
     single_or_group
 }
@@ -244,5 +277,50 @@ mod type_parse_tests {
         assert_eq!(list_string, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![Type::SingleType("String".to_string()), Type::SingleType("a".to_string()), Type::SingleType("b".to_string()), Type::SingleType("c".to_string())] });
         
     }
+
+    #[test]
+    fn test_tuple() {
+        let result = parse_type().parse("(Int, String)");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: (Int, String)");
+        }
+
+        let tuple = result.unwrap();
+
+        assert_eq!(tuple, Type::Tuple(vec![Type::SingleType("Int".to_string()), Type::SingleType("String".to_string())]));
+    }
+
+    #[test]
+    fn test_nested_tuples() {
+        let result = parse_type().parse("(Int, (String, Int))");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: (Int, (String, Int))");
+        }
+
+        let tuple = result.unwrap();
+
+        assert_eq!(tuple, Type::Tuple(vec![Type::SingleType("Int".to_string()), Type::Tuple(vec![Type::SingleType("String".to_string()), Type::SingleType("Int".to_string())])]));
+    }
+
+    #[test]
+    fn test_tuple_in_type_list() {
+        let result = parse_type().parse("(List (Int, String))");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failure to parse mixed type: (List (Int, String))");
+        }
+
+        let tuple = result.unwrap();
+
+        assert_eq!(tuple, Type::TypeList { name: Box::new(Type::SingleType("List".to_string())), parameters: vec![Type::Tuple(vec![Type::SingleType("Int".to_string()), Type::SingleType("String".to_string())])]} );
+    }
+
+        
+    
 
 }
