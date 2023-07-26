@@ -1,7 +1,6 @@
 use chumsky::prelude::*;
 
-use crate::parser::lexer::{Token, keywords, comments, whitespace, identifiers, literals, operators, symbols};
-use crate::parser::lexer::*;
+use crate::parser::lexer::{Token, lexer};
 
 pub enum Type {
     WithTypeList {
@@ -17,6 +16,17 @@ pub enum Type {
     Tuple(Vec<Type>),
 }
 
+
+fn parse_identifier() -> impl Parser<Token, String, Error = Simple<Token>> {
+    
+    let identifier = just(Token::Identifier(_))
+        .map(|x| match x {
+            Token::Identifier(x) => x,
+            _ => unreachable!(),
+        });
+
+    identifier
+}
 
 
 /*

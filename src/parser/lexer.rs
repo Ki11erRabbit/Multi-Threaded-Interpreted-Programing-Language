@@ -4,7 +4,7 @@ use std::fmt;
 
 
 //TODO: Change String to &str
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone,Hash,Eq)]
 pub enum Token {
     WhiteSpace(String),
     Number(String),
