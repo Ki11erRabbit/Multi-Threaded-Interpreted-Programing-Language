@@ -745,8 +745,8 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
 
 
 
-    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:=");
-    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:=");
+    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:");
+    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
 
     /*let cant_be = choice((
         just(":="),
@@ -755,6 +755,7 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         just("=>"),
         just("."),
         just("="),
+        cant_start_with.then(cant_contain.repeated())
         ));*/
 
     //these handle weird edge cases in the parser
@@ -765,14 +766,14 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         just("con{}").map(|s| s.to_string()),
         just("add:").map(|s| s.to_string()),
         just("remove:").map(|s| s.to_string()),
-        just("..").map(|s| s.to_string()),
-        just("...").map(|s| s.to_string()),
-        just("..=").map(|s| s.to_string()),
-        just("==").map(|s| s.to_string()),
-        just("!=").map(|s| s.to_string()),
-        just("<=").map(|s| s.to_string()),
-        just(">=").map(|s| s.to_string()),
-        just(">>=").map(|s| s.to_string()),
+        //just("..").map(|s| s.to_string()),
+        //just("...").map(|s| s.to_string()),
+        //just("..=").map(|s| s.to_string()),
+       // just("==").map(|s| s.to_string()),
+       // just("!=").map(|s| s.to_string()),
+        //just("<=").map(|s| s.to_string()),
+        //just(">=").map(|s| s.to_string()),
+        //just(">>=").map(|s| s.to_string()),
     ));
 
 
