@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use crate::parser::lexer::{Token, lexer};
+use crate::parser::symbols_parser::identifiers;
 
 pub enum Type {
     WithTypeList {
@@ -8,119 +8,105 @@ pub enum Type {
         parameters: Vec<Type>,
     },
     Function {
-        parameters: Vec<(Option<String>, Type)>,
-        effects: Vec<String>,
+        parameters: Vec<(Type)>,
+        effects: Vec<Type>,
         return_type: Box<Type>,
     },
     SingleType(String),
     Tuple(Vec<Type>),
 }
 
+/// This function parses something like this (List a) or (List (a, b, c))
+/// Or (Hashmap a b)
+fn parse_type_group() -> impl Parser<char, Type, Error = Simple<char>> {
 
-fn parse_identifier() -> impl Parser<Token, String, Error = Simple<Token>> {
-    
-    let identifier = just(Token::Identifier(_))
-        .map(|x| match x {
-            Token::Identifier(x) => x,
-            _ => unreachable!(),
-        });
+    let identifier = identifiers();
 
-    identifier
-}
-
-
-/*
-
-/// This function parses a single generic type list, e.g. `<a, b, c>`
-/// This should also parse this <List <a>, b, c>
-fn parse_type_list() -> impl Parser<char, Vec<Type>, Error = Simple<char>> {
-
-    let type_item = parse_type().padded()
-        .then(symbols().just::<char,Token, Simple<char>>(Token::Comma).padded())
-        .or(symbols().just(Token::ParenRight).padded().ignore());
-    
-    let generic_type_list = just("<").padded()
-        .then(list.repeated())
-        .then(just(">")).padded()
-        .map(|((_, types), _)| types.into_iter().map(|x| Type::SingleType(x)).collect());
-
-    generic_type_list
-}
-
-
-/// This should parse something like this List <a> or List<Int>
-fn parse_type_with_list() -> impl Parser<char, Type, Error = Simple<char>> {
-
-    let type_with_generic = identifiers().map(|x| x.to_string()).padded()
-        .then(parse_type_list()).padded()
+    let type_group = just('(')
+        .ignore_then(identifier).padded()
+        .then(parse_type().padded().repeated())
+        .then_ignore(just(')'))
         .map(|(name, parameters)| Type::WithTypeList { name, parameters });
 
-    type_with_generic
+
+    type_group
+
 }
 
+/// This function parses something like this (a, b, c) or ()
+fn parse_tuple() -> impl Parser<char, Type, Error = Simple<char>> {
 
-
-/// This function parses one of the following:
-/// a
-/// fn(a, b, c) exn -> d
-/// (a, b, c)
-/// Eq <a>
-/// Eq <List <a>>
-/// List <a>
-fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
-
-    // Parses a, or a
     let tuple_body = parse_type().padded()
-        .then(symbols().just(Token::Comma).padded())
-        .or(symbols().just(Token::ParenRight).padded().ignore());
+        .then_ignore(one_of(",)").padded());
 
-    // Parses ()
-    let empty_tuple = symbols().just(Token::ParenLeft).padded()
-        .then(symbols().just(Token::ParenRight).padded())
-        .map(|_| Type::Tuple(vec![]));
 
-    // Parses (a, b, c) or (a)
-    let filled_tuple = symbols().just(Token::ParenLeft).padded()
-        .then(tuple_body.repeated())
-        .then(symbols().just(Token::ParenRight).padded())
-        .map(|((_, types), _)| Type::Tuple(types));
+    let empty_tuple = just('(')
+        .ignore_then(just(')').padded())
+        .map(|_| Type::Tuple(Vec::new()));
 
-    // Parses (a, b, c) or (a) or ()
+    let filled_tuple = just('(')
+        .ignore_then(tuple_body.repeated()).padded()
+        .then_ignore(just(')'))
+        .map(|types| Type::Tuple(types));
+
     let tuple = choice((empty_tuple, filled_tuple));
 
-    // Parses a
-    let single_type = identifiers().map(|x| x.to_string()).padded()
-        .map(|x| Type::SingleType(x));
+    tuple
+}
 
-    let type_with_sub_types = identifiers().map(|x| x.to_string()).padded()
-        .then(parse_type_list()).padded()
-        .map(|(name, parameters)| Type::WithTypeList { name, parameters });
+/// This function parses something like this:
+/// fn(a, b, c) exn -> Int
+fn parse_function() -> impl Parser<char, Type, Error = Simple<char>> {
 
-    let function_type = keywords().just(Token::Function).padded()
-        .then(tuple)
-        .then(parse_effects().padded())
-        .then(symbols().just(Token::FunctionReturn).padded())
+    let parameter = parse_type().padded()
+        .then_ignore(one_of(",)").padded());
+
+    let effects = parse_type().padded()
+        .then_ignore(choice((just(","), just("->"))).padded());
+
+    let function_with_effects = text::keyword("fn")
+        .ignore_then(just('('))
+        .ignore_then(parameter.repeated())
+        .then_ignore(just(')'))
+        .then(effects.repeated()).padded()
+        .then_ignore(just("->"))
         .then(parse_type().padded())
-        .map(|((((_, parameters), _), effects), return_type)| Type::Function { parameters, effects, return_type });
+        .map(|((parameters, effects), return_type)| Type::Function { parameters, effects, return_type: Box::new(return_type) });
 
 
-    let types = choice((type_with_sub_types, function_type, tuple, single_type));
+    let parameter = parse_type().padded()
+        .then_ignore(one_of(",)").padded());
 
-    types
+    let function_without_effects = text::keyword("fn")
+        .ignore_then(just('('))
+        .ignore_then(parameter.repeated())
+        .then_ignore(just(')'))
+        .then_ignore(just("->"))
+        .then(parse_type().padded())
+        .map(|(parameters, return_type)| Type::Function { parameters, effects: Vec::new(), return_type: Box::new(return_type) });
+
+    choice((function_with_effects, function_without_effects))
 }
 
 
+/// This function parses types like:
+/// (a, b, c)
+/// (List a)
+/// a
+/// Int
+/// fn(a, b, c) exn -> Int
+fn parse_type() -> impl Parser<char, Type, Error = Simple<char>> {
 
-fn parse_effects() -> impl Parser<char, Vec<String>, Error = Simple<char>> {
+    let single_type = identifiers()
+        .map(|name| Type::SingleType(name));
 
-    
-    let effect = identifiers().map(|x| x.to_string()).padded();
+    let tuple = parse_tuple();
 
-    let effect_list = effect
-        .then(symbols().just(Token::Comma).padded())
-        .or(just("->").padded().ignore())
-        .repeated()
-        .map(|(effects, _)| effects);
+    let type_group = parse_type_group();
 
-    effects
-}*/
+
+    let function = parse_function();
+
+    choice((single_type, tuple, type_group, function))
+
+}
