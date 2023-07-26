@@ -1,5 +1,6 @@
 use chumsky::prelude::*;
 
+use std::fmt;
 
 
 //TODO: Change String to &str
@@ -53,6 +54,62 @@ pub enum Token {
     Return,
     Mod,
     Import,
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::WhiteSpace(s) => write!(f, "{}", s),
+            Token::Number(s) => write!(f, "{}", s),
+            Token::String(s) => write!(f, "{}", s),
+            Token::Char(c) => write!(f, "{}", c),
+            Token::Identifier(s) => write!(f, "{}", s),
+            Token::Operator(s) => write!(f, "{}", s),
+            Token::Assignment => write!(f, "="),
+            Token::MutableAssignment => write!(f, ":="),
+            Token::BracketLeft => write!(f, "["),
+            Token::BracketRight => write!(f, "]"),
+            Token::ParenLeft => write!(f, "("),
+            Token::ParenRight => write!(f, ")"),
+            Token::CurlyLeft => write!(f, "{{"),
+            Token::CurlyRight => write!(f, "}}"),
+            Token::Attribute => write!(f, "@"),
+            Token::Comma => write!(f, ","),
+            Token::Semicolon => write!(f, ";"),
+            Token::Colon => write!(f, ":"),
+            Token::Namespace => write!(f, "::"),
+            Token::Period => write!(f, "."),
+            Token::WildCard => write!(f, "_"),
+            Token::Comment(s) => write!(f, "{}", s),
+            Token::MatchArm => write!(f, "=>"),
+            Token::FunctionReturn => write!(f, "->"),
+            Token::Class => write!(f, "class"),
+            Token::Instance => write!(f, "instance"),
+            Token::Default => write!(f, "default"),
+            Token::Sum => write!(f, "sum"),
+            Token::Product => write!(f, "product"),
+            Token::Type => write!(f, "type"),
+            Token::Function => write!(f, "fn"),
+            Token::Match => write!(f, "match"),
+            Token::While => write!(f, "while"),
+            Token::ElWhile => write!(f, "elwhile"),
+            Token::For => write!(f, "for"),
+            Token::Loop => write!(f, "loop"),
+            Token::If => write!(f, "if"),
+            Token::Elif => write!(f, "elif"),
+            Token::Else => write!(f, "else"),
+            Token::Continue => write!(f, "continue"),
+            Token::Break => write!(f, "break"),
+            Token::In => write!(f, "in"),
+            Token::Typeis => write!(f, "typeis"),
+            Token::Effect => write!(f, "effect"),
+            Token::With => write!(f, "with"),
+            Token::Return => write!(f, "return"),
+            Token::Mod => write!(f, "mod"),
+            Token::Import => write!(f, "import"),
+        }
+    }
+            
 }
 
 
@@ -921,17 +978,17 @@ mod whitespace_tests {
 
 pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
-    let token = recursive(|_| {
-        choice((
+    let token = choice((
             keywords(),
-            comments(),
-            whitespace(),
             identifiers(),
+            whitespace(),
+        symbols(),
+        operators(),
             literals(),
-            symbols(),
-        ))});
+            comments(),
+        ));
     
-    token.repeated()
+    token.repeated().then_ignore(end())
     
 }
 
