@@ -6,7 +6,7 @@ use std::fmt;
 //TODO: Change String to &str
 #[derive(Debug, PartialEq, Clone,Hash,Eq)]
 pub enum Token {
-    WhiteSpace(String),
+    WhiteSpace,
     Number(String),
     String(String),
     Char(char),
@@ -59,7 +59,7 @@ pub enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Token::WhiteSpace(s) => write!(f, "{}", s),
+            Token::WhiteSpace => write!(f, " "),
             Token::Number(s) => write!(f, "{}", s),
             Token::String(s) => write!(f, "{}", s),
             Token::Char(c) => write!(f, "{}", c),
@@ -307,7 +307,7 @@ pub fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
             just(")").to(Token::ParenRight),
             just("{").to(Token::CurlyLeft),
             just("}").to(Token::CurlyRight),
-            just(",").to(Token::Comma),
+            just(",").to(Token::Comma).padded(),
             just(";").to(Token::Semicolon),
             just("->").to(Token::FunctionReturn),
             just("=>").to(Token::MatchArm),
@@ -985,7 +985,8 @@ pub fn whitespace() -> impl Parser<char, Token, Error = Simple<char>> {
         just("\r"),
     ));
 
-    whitespace.map(|s| Token::WhiteSpace(s.to_string()))
+
+    whitespace.map(|_| Token::WhiteSpace)
 }
 
 #[cfg(test)]
@@ -1004,19 +1005,19 @@ mod whitespace_tests {
 
         let token = result.unwrap();
 
-        assert_eq!(token, Token::WhiteSpace(" ".to_string()), "Token not whitespace");
+        assert_eq!(token, Token::WhiteSpace, "Token not whitespace");
     }
 }
 
 pub fn tokenizer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
     let token = choice((
-        keywords(),
+        keywords().padded(),
         symbols(),
-        operators(),
+        operators().padded(),
         whitespace(),
-        literals(),
-        comments(),
+        literals().padded(),
+        comments().padded(),
         identifiers(),
     ));
 
@@ -1034,7 +1035,37 @@ mod lexer_tests {
     use super::*;
 
 
-    /*#[test]
+    #[test]
+    fn test_assignment() {
+        let result = tokenizer().parse("a = 1");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing assignment");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::Identifier("a".to_string()), Token::WhiteSpace, Token::Assignment, Token::WhiteSpace, Token::Number("1".to_string())], "Token not assignment");
+    }
+
+    #[test]
+    fn test_type_class() {
+        let result = tokenizer().parse("class Monad m { fn (>>=)(m a, fn (a) -> m b) -> m b }");
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Error parsing type class");
+        }
+
+        let tokens = result.unwrap();
+
+        assert_eq!(tokens, vec![Token::Class, Token::WhiteSpace, Token::Identifier("Monad".to_string()), Token::WhiteSpace, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::CurlyLeft, Token::WhiteSpace, Token::Function, Token::WhiteSpace, Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::Identifier("a".to_string()), Token::Comma, Token::WhiteSpace, Token::Function, Token::WhiteSpace, Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::WhiteSpace, Token::FunctionReturn, Token::WhiteSpace, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace, Token::FunctionReturn, Token::WhiteSpace, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::Identifier("b".to_string()), Token::WhiteSpace, Token::CurlyRight], "Token not type class");
+    }
+    
+    /*
+
+    #[test]
     fn test_assignment() {
         let result = tokenizer().parse("a = 1");
 
@@ -1061,8 +1092,6 @@ mod lexer_tests {
 
         assert_eq!(tokens, vec![Token::Class, Token::WhiteSpace(" ".to_string()), Token::Identifier("Monad".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::CurlyLeft, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("a".to_string()), Token::Comma, Token::WhiteSpace(" ".to_string()), Token::Function, Token::WhiteSpace(" ".to_string()), Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace(" ".to_string()), Token::FunctionReturn, Token::WhiteSpace(" ".to_string()), Token::Identifier("m".to_string()), Token::WhiteSpace(" ".to_string()), Token::Identifier("b".to_string()), Token::WhiteSpace(" ".to_string()), Token::CurlyRight], "Token not type class");
     }*/
-    
-
     
 
 }

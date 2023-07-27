@@ -72,20 +72,23 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     let single_type = filter_map(|span: Range<usize> , token| match token {
         Token::Identifier(value) => Ok(Type::Single(value)),
         _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-    });
+    })
+        .labelled("Single Type Parser");
 
     let tuple_or_single = recursive(|tuple| tuple
-                          .separated_by(just(Token::Comma).padded_by(just(Token::WhiteSpace(" ".to_string()))))
-                          .delimited_by(just(Token::ParenLeft).padded_by(just(Token::WhiteSpace(" ".to_string()))), just(Token::ParenRight).padded_by(just(Token::WhiteSpace(" ".to_string()))))
+                          .separated_by(just(Token::Comma))
+                          .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
                         .map(|types| Type::Tuple(types))
                                     .or(single_type.clone())
-    );
+    ).labelled("Tuple or Single Type Parser");
     let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
     
     let tuple = choice((empty_tuple, tuple_or_single));
+    //let tuple = tuple_or_single.clone();
 
+    
     let type_list = recursive(|tg| tg
-                              .separated_by(just(Token::WhiteSpace(" ".to_string())))
+                              .separated_by(just(Token::WhiteSpace))
                               .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
                               .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
                             .or(tuple.clone())
@@ -277,7 +280,15 @@ mod type_parser_tests {
 
     #[test]
     fn test_type_list() {
-        let result = type_parser().parse(lexer("(List Int)").unwrap());
+
+        let lexer_result = lexer("(List Int)");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex type list: (List Int)");
+        }
+        
+        let result = type_parser().parse(lexer_result.unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
@@ -291,7 +302,14 @@ mod type_parser_tests {
 
     #[test]
     fn test_nested_type_list() {
-        let result = type_parser().parse(lexer("(List (List Int))").unwrap());
+        let lexer_result = lexer("(List (List Int))");
+        
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex type list: (List (List Int))");
+        }
+        
+        let result = type_parser().parse(lexer_result.unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
