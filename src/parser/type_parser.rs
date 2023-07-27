@@ -54,9 +54,9 @@ impl fmt::Display for Type {
             },
             Type::TypeList{name, parameters} => {
                 let mut output = format!("({}", name);
-                for p in parameters {
+                /*for p in parameters {
                     output += &format!(" {}", p);
-                }
+                }*/
                 output += ")";
                 write!(f, "{}", output)
             }
@@ -78,12 +78,34 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                           .separated_by(just(Token::Comma))
                           .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
                         .map(|types| Type::Tuple(types))
-                                    //.or(single_type.clone())
+                                    .or(single_type.clone())
     );
     let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
     
     let tuple = choice((empty_tuple, tuple_or_single));
 
+    let type_list = recursive(|tg| tg
+                              .separated_by(just(Token::WhiteSpace(" ".to_string())))
+                              .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                              .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
+                            .or(tuple.clone())
+    );
+
+    
+    /*let type_list = recursive(|tg| tg
+        .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                              .then(tuple.clone())
+                            .map(|types| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()}));*/
+
+    /*let type_list = recursive(|tg| tg
+                              .separated_by(just(Token::Comma))
+                              .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
+                              .map(|types| Type::Tuple(types)));
+
+    let type_group = recursive(|tg| tg
+                               .then(single_type.clone())
+                               .then(type_list.clone())
+                               .map(|((name,_), parameters)| Type::TypeList{name: Box::new(name), parameters: Box::new(parameters)}));*/
 
     /*let type_list: Recursive<Token, Vec<Vec<Vec<Type>>>, Simple<Token>> = recursive(|tg: chumsky::recursive::Recursive<'_,Token, Vec<Vec<Vec<Type>>>, Simple<Token>>| tg
                               .separated_by(just(Token::Comma))
@@ -171,8 +193,9 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                                */
                                
     
-    let basic_types = choice((type_group.clone(), tuple));
-    basic_types
+    //let basic_types = choice((type_list.clone(), tuple));
+    //basic_types
+    type_list
     /*let function_args = basic_types.clone()
         .separated_by(just(Token::Comma));
 
@@ -254,21 +277,21 @@ mod type_parser_tests {
 
     #[test]
     fn test_type_list() {
-        let result = type_parser().parse(lexer("List<Int>").unwrap());
+        let result = type_parser().parse(lexer("(List Int)").unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
-            assert!(false, "Failed to parse type list: List<Int>");
+            assert!(false, "Failed to parse type list: (List Int)");
         }
 
         let result = result.unwrap();
 
-        assert_eq!(result, Type::TypeList { name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::Single("Int".to_string())] }, "Failed to parse type list: List<Int>");
+        assert_eq!(result, Type::TypeList { name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::Single("Int".to_string())] }, "Failed to parse type list: (List Int)");
     }
 
     #[test]
     fn test_nested_type_list() {
-        let result = type_parser().parse(lexer("List<List<Int>>").unwrap());
+        let result = type_parser().parse(lexer("(List (List Int))").unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
