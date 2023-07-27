@@ -75,8 +75,8 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     });
 
     let tuple_or_single = recursive(|tuple| tuple
-                          .separated_by(just(Token::Comma))
-                          .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                          .separated_by(just(Token::Comma).padded_by(just(Token::WhiteSpace(" ".to_string()))))
+                          .delimited_by(just(Token::ParenLeft).padded_by(just(Token::WhiteSpace(" ".to_string()))), just(Token::ParenRight).padded_by(just(Token::WhiteSpace(" ".to_string()))))
                         .map(|types| Type::Tuple(types))
                                     .or(single_type.clone())
     );
