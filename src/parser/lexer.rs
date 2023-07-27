@@ -303,17 +303,17 @@ pub fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let symbol = recursive(|sym| {
         choice((
-            just("()").to(Token::Unit),
-            just("[").to(Token::BracketLeft),
-            just("]").to(Token::BracketRight),
+            just("()").to(Token::Unit).padded(),
+            just("[").to(Token::BracketLeft).padded(),
+            just("]").to(Token::BracketRight).padded(),
             just("(").to(Token::ParenLeft),
             just(")").to(Token::ParenRight),
-            just("{").to(Token::CurlyLeft),
-            just("}").to(Token::CurlyRight),
+            just("{").to(Token::CurlyLeft).padded(),
+            just("}").to(Token::CurlyRight).padded(),
             just(",").to(Token::Comma).padded(),
-            just(";").to(Token::Semicolon),
-            just("->").to(Token::FunctionReturn),
-            just("=>").to(Token::MatchArm),
+            just(";").to(Token::Semicolon).padded(),
+            just("->").to(Token::FunctionReturn).padded(),
+            just("=>").to(Token::MatchArm).padded(),
             just("::").to(Token::Namespace),
             ))
     });
@@ -778,7 +778,7 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
     ));
 
     let valid_symbols = choice((one_of("+-*/%&|^<>~!?$#=").repeated().at_least(1),
-                                just('.').repeated().at_least(2)));
+                                just('.').repeated().at_least(2))).padded();
 
 
     let normal = cant_start_with
@@ -1016,12 +1016,12 @@ pub fn tokenizer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
     let token = choice((
         keywords().padded(),
-        symbols(),
+        symbols().padded(),
         operators().padded(),
-        whitespace(),
+        //whitespace(),
         literals().padded(),
         comments().padded(),
-        identifiers(),
+        identifiers().padded(),
     ));
 
     
