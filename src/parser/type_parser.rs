@@ -81,7 +81,8 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                         .map(|types| Type::Tuple(types))
                                     .or(single_type.clone())
     ).labelled("Tuple or Single Type Parser");
-    let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
+    //let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
+    let empty_tuple = just(Token::Unit).map(|_| Type::Tuple(vec![]));
     
     let tuple = choice((empty_tuple, tuple_or_single));
     //let tuple = tuple_or_single.clone();
@@ -95,105 +96,6 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     );
 
     
-    /*let type_list = recursive(|tg| tg
-        .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                              .then(tuple.clone())
-                            .map(|types| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()}));*/
-
-    /*let type_list = recursive(|tg| tg
-                              .separated_by(just(Token::Comma))
-                              .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
-                              .map(|types| Type::Tuple(types)));
-
-    let type_group = recursive(|tg| tg
-                               .then(single_type.clone())
-                               .then(type_list.clone())
-                               .map(|((name,_), parameters)| Type::TypeList{name: Box::new(name), parameters: Box::new(parameters)}));*/
-
-    /*let type_list: Recursive<Token, Vec<Vec<Vec<Type>>>, Simple<Token>> = recursive(|tg: chumsky::recursive::Recursive<'_,Token, Vec<Vec<Vec<Type>>>, Simple<Token>>| tg
-                              .separated_by(just(Token::Comma))
-                              .delimited_by(filter_map(|span, token| match token {
-                                    Token::Identifier(value) => Ok(value),
-                                    _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-                              },), just(Token::Identifier(">".to_string())))
-                              .map(|types| types));
-
-    let type_group = filter_map(|span, token| match token {
-        Token::Identifier(value) => Ok(Type::Single(value)),
-        _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-    }).rewind().then(type_list.clone())
-    .map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters: parameters[0].to_owned()});*/
-
-    
-    /*let type_list = single_type.clone()
-        .separated_by(just(Token::Comma))
-        .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())));
-
-    let type_group = recursive(|tg| tg
-                               .then(type_list.clone())
-                            .map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters}));*/
-
-    /*let type_group = filter_map(|span, token| match token {
-        Token::Identifier(value) => Ok(Type::Single(value)),
-        _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-    }).then(type_list.clone()).map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});*/
-
-    
-
-    /*let type_list = choice((type_group, tuple.clone()))
-        .separated_by(just(Token::Comma))
-        .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())));*/
-
-    /*let type_group = filter_map(|span, token| match token {
-        Token::Identifier(value) => Ok(Type::Single(value)),
-        _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-    }).then(type_list.clone())
-    .map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});*/
-
-
-
-
-    
-    /*let type_group = recursive(|tg| tg
-        .then(
-            filter_map(|span, token| match token {
-                    Token::Identifier(value) => Ok(Type::Single(value)),
-                    _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-            })
-                               .separated_by(just(Token::Comma))
-                .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
-                .map(|vec| Type::TypeList{name: Box::new(vec[0].to_owned()), parameters: vec[1..].to_vec()})
-        )
-    );*/
-                               
-
-
-
-
-    /*let type_group = recursive(|tg|
-                               filter_map(|span, token| match token {
-                                      Token::Identifier(value) => Ok(Type::Single(value)),
-                                      _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-                               })
-                               .then(tg
-                                     .separated_by(just(Token::Comma))
-                                     .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
-                                     .map(|vec| vec))
-                            .map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters})
-    );*/
-
-
-    /*let type_group = recursive(|tg| tg
-        .then(
-            filter_map(|span, token| match token {
-                    Token::Identifier(value) => Ok(Type::Single(value)),
-                    _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-            })
-        )
-                               .then(type_list.clone())
-                            .map(|((name, parameters), parameters2)| Type::TypeList{name: Box::new(name), parameters: parameters2}));
-                               
-                               */
                                
     
     //let basic_types = choice((type_list.clone(), tuple));

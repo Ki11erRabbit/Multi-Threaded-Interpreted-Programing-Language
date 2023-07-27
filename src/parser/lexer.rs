@@ -7,6 +7,7 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone,Hash,Eq)]
 pub enum Token {
     WhiteSpace,
+    Unit,
     Number(String),
     String(String),
     Char(char),
@@ -60,6 +61,7 @@ impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Token::WhiteSpace => write!(f, " "),
+            Token::Unit => write!(f, "()"),
             Token::Number(s) => write!(f, "{}", s),
             Token::String(s) => write!(f, "{}", s),
             Token::Char(c) => write!(f, "{}", c),
@@ -301,6 +303,7 @@ pub fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let symbol = recursive(|sym| {
         choice((
+            just("()").to(Token::Unit),
             just("[").to(Token::BracketLeft),
             just("]").to(Token::BracketRight),
             just("(").to(Token::ParenLeft),
@@ -1027,7 +1030,26 @@ pub fn tokenizer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
 }
 
 pub fn lexer(input: &str) -> Result<Vec<Token>, Vec<Simple<char>>> {
-    tokenizer().parse(input)
+    let result = tokenizer().parse(input)?;
+
+    // This merges all whitespace tokens into one
+    let mut new_result = Vec::new();
+    let mut found_whitespace = false;
+    for token in result {
+        if found_whitespace && token == Token::WhiteSpace {
+            continue;
+        }
+        else if token == Token::WhiteSpace {
+            found_whitespace = true;
+            new_result.push(token);
+        }
+        else {
+            found_whitespace = false;
+            new_result.push(token);
+        }
+        
+    }
+    Ok(new_result)
 }
 
 #[cfg(test)]
