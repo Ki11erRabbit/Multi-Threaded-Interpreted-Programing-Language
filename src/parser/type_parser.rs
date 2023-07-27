@@ -18,6 +18,7 @@ pub enum Type {
     },
     Single(String),
     Tuple(Vec<Type>),
+    Unit,
 }
 
 
@@ -54,12 +55,13 @@ impl fmt::Display for Type {
             },
             Type::TypeList{name, parameters} => {
                 let mut output = format!("({}", name);
-                /*for p in parameters {
+                for p in parameters {
                     output += &format!(" {}", p);
-                }*/
+                }
                 output += ")";
                 write!(f, "{}", output)
-            }
+            },
+            Type::Unit => write!(f, "()"),
             
         }
     }
@@ -82,7 +84,7 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                                     .or(single_type.clone())
     ).labelled("Tuple or Single Type Parser");
     //let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
-    let empty_tuple = just(Token::Unit).map(|_| Type::Tuple(vec![]));
+    let empty_tuple = just(Token::Unit).map(|_| Type::Unit);
     
     let tuple = choice((empty_tuple, tuple_or_single));
     //let tuple = tuple_or_single.clone();
@@ -133,8 +135,35 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
 
     let function = choice((function_with_effects, function_without_effects));
 
-    choice((function, type_list))
+    let escaped_function = just(Token::ParenLeft)
+        .ignore_then(function.clone())
+        .then_ignore(just(Token::ParenRight))
+        .labelled("Escaped Function Parser");
 
+    let function_or_type_list = choice((function, escaped_function ,type_list, single_type));
+
+    let tuple_or_function = recursive(|tuple| tuple
+                          .separated_by(just(Token::Comma))
+                          .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                        .map(|types| Type::Tuple(types))
+                                      .or(function_or_type_list)
+    ).labelled("Tuple or Function Type Parser");
+
+    
+    let type_list = recursive(|tg| tg.repeated()
+                              .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                            .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
+                              .or(tuple_or_function));
+
+    /*let recursive_type_parser = recursive(|tg| choice((
+        type_list.clone(),
+        tg
+            ))
+    )
+        .labelled("Recursive Type Parser");
+
+    recursive_type_parser*/
+    type_list
 }
 
 
@@ -195,7 +224,7 @@ mod type_parser_tests {
 
         let result = result.unwrap();
 
-        assert_eq!(result, Type::Tuple(vec![]), "Failed to parse empty tuple: ()");
+        assert_eq!(result, Type::Unit, "Failed to parse empty tuple: ()");
     }
 
     #[test]
@@ -282,6 +311,141 @@ mod type_parser_tests {
 
         assert_eq!(result, Type::Function { parameters: vec![Type::Single("Int".to_string())], effects: vec![Type::Single("exn".to_string())], return_type: Box::new(Type::Single("Int".to_string())) }, "Failed to parse function type: fn(Int) <exn> -> Int");
     }
-    
+
+    #[test]
+    fn test_function_many_effects() {
+        let lexer_result = lexer("fn(Int) <exn, io> -> Int");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex function type: fn(Int) <exn, io> -> Int");
+        }
+
+        let result = type_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse function type: fn(Int) <exn, io> -> Int");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Function { parameters: vec![Type::Single("Int".to_string())], effects: vec![Type::Single("exn".to_string()), Type::Single("io".to_string())], return_type: Box::new(Type::Single("Int".to_string())) }, "Failed to parse function type: fn(Int) <exn, io> -> Int");
+    }
+
+    #[test]
+    fn test_complicated_tuple() {
+        let lexer_result = lexer("(Int, (Int, Int), (List Int), fn(Int) -> Int)");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex complicated tuple: (Int, (Int, Int), (List Int), fn(Int) -> Int)");
+        }
+
+        let result = type_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse complicated tuple: (Int, (Int, Int), (List Int), fn(Int) -> Int)");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Tuple(vec![
+            Type::Single("Int".to_string()),
+            Type::Tuple(vec![
+                Type::Single("Int".to_string()),
+                Type::Single("Int".to_string())
+            ]),
+            Type::TypeList {
+                name: Box::new(Type::Single("List".to_string())),
+                parameters: vec![Type::Single("Int".to_string())]
+            },
+            Type::Function {
+                parameters: vec![Type::Single("Int".to_string())],
+                effects: vec![],
+                return_type: Box::new(Type::Single("Int".to_string()))
+            }
+        ]), "Failed to parse complicated tuple: (Int, (Int, Int), (List Int), fn(Int) -> Int)");
+    }
+
+
+    #[test]
+    fn test_complicated_function() {
+        let lexer_result = lexer("fn(Int, (Int, Int), (List Int), fn(Int) -> Int) -> Int");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex complicated function: fn(Int, (Int, Int), (List Int), fn(Int) -> Int) -> Int");
+        }
+
+        let result = type_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse complicated function: fn(Int, (Int, Int), (List Int), fn(Int) -> Int) -> Int");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Function {
+            parameters: vec![
+                Type::Single("Int".to_string()),
+                Type::Tuple(vec![
+                    Type::Single("Int".to_string()),
+                    Type::Single("Int".to_string())
+                ]),
+                Type::TypeList {
+                    name: Box::new(Type::Single("List".to_string())),
+                    parameters: vec![Type::Single("Int".to_string())]
+                },
+                Type::Function {
+                    parameters: vec![Type::Single("Int".to_string())],
+                    effects: vec![],
+                    return_type: Box::new(Type::Single("Int".to_string()))
+                }
+            ],
+            effects: vec![],
+            return_type: Box::new(Type::Single("Int".to_string()))
+        }, "Failed to parse complicated function: fn(Int, (Int, Int), (List Int), fn(Int) -> Int) -> Int");
+    }
+
+    #[test]
+    fn test_complicated_type_list() {
+        let lexer_result = lexer("(List fn((Int, Int)) -> Int fn(Int) -> Int)");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex complicated type list: List fn((Int, Int)) -> Int fn(Int) -> Int");
+        }
+
+        let result = type_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse complicated type list: List fn((Int, Int)) -> Int fn(Int) -> Int");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::TypeList {
+            name: Box::new(Type::Single("List".to_string())),
+            parameters: vec![
+                Type::Function {
+                    parameters: vec![Type::Tuple(vec![
+                        Type::Single("Int".to_string()),
+                        Type::Single("Int".to_string())
+                    ])],
+                    effects: vec![],
+                    return_type: Box::new(Type::Single("Int".to_string()))
+                },
+                Type::Function {
+                    parameters: vec![Type::Single("Int".to_string())],
+                    effects: vec![],
+                    return_type: Box::new(Type::Single("Int".to_string()))
+                }
+            ]
+        }, "Failed to parse complicated type list: List fn((Int, Int)) -> Int fn(Int) -> Int");
+    }
 
 }
