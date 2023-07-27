@@ -78,20 +78,45 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                           .separated_by(just(Token::Comma))
                           .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
                         .map(|types| Type::Tuple(types))
-                                    .or(single_type.clone())
     );
     let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
     
     let tuple = choice((empty_tuple, tuple_or_single));
 
-    let type_list = tuple.clone()
+    /*let type_list = tuple.clone()
         .separated_by(just(Token::Comma))
         .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())));
 
     let type_group = filter_map(|span, token| match token {
         Token::Identifier(value) => Ok(Type::Single(value)),
         _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-    }).then(type_list.clone()).map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});
+    }).then(type_list.clone()).map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});*/
+
+    /*let type_list = choice((type_group, tuple.clone()))
+        .separated_by(just(Token::Comma))
+        .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())));
+
+    let type_group = filter_map(|span, token| match token {
+        Token::Identifier(value) => Ok(Type::Single(value)),
+        _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
+    }).then(type_list.clone())
+    .map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});*/
+
+
+    let type_group = recursive(|tg| tg
+        .then(
+            filter_map(|span, token| match token {
+                    Token::Identifier(value) => Ok(Type::Single(value)),
+                    _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
+            })
+                               .separated_by(just(Token::Comma))
+                .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
+                .map(|vec| Type::TypeList{name: Box::new(vec[0].to_owned()), parameters: vec[1..].to_vec()})
+    ));
+                               
+
+
+
 
     /*let type_group = recursive(|tg|
                                filter_map(|span, token| match token {
@@ -119,9 +144,9 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                                
                                
     
-    let basic_types = choice((type_group, tuple));
-    
-    let function_args = basic_types.clone()
+    let basic_types = choice((type_group.clone(), tuple));
+    basic_types
+    /*let function_args = basic_types.clone()
         .separated_by(just(Token::Comma));
 
     let function_effects = type_list;
@@ -135,7 +160,7 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
         .then(basic_types.clone())
         .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)});
 
-    choice((function, basic_types))
+    choice((type_group,function, basic_types))*/
 
 }
 
