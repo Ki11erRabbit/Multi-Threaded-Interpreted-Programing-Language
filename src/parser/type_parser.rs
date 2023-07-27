@@ -106,6 +106,9 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     //let basic_types = choice((type_list.clone(), tuple));
     //basic_types
     //type_list
+
+    
+    
     let function_args = type_list.clone()
         .separated_by(just(Token::Comma));
 
@@ -114,7 +117,20 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
         .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string()))
         );
 
-    let function_with_effects = just(Token::Function)
+
+    let function_with_effects = recursive(|fun|
+                                          just(Token::Function)
+                                          .then_ignore(just(Token::ParenLeft))
+                                          .then(fun.separated_by(just(Token::Comma)))
+                                          .then_ignore(just(Token::ParenRight))
+                                          .then(function_effects.clone())
+                                          .then_ignore(just(Token::FunctionReturn))
+                                          .then(type_list.clone())
+                                          .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
+                                        .or(type_list.clone())
+    );
+    
+    /*let function_with_effects = just(Token::Function)
         .then_ignore(just(Token::ParenLeft))
         .then(function_args.clone())
         .then_ignore(just(Token::ParenRight))
@@ -122,25 +138,37 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
         .then_ignore(just(Token::FunctionReturn))
         .then(type_list.clone())
         .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
-        .labelled("Function with Effects Parser");
+    .labelled("Function with Effects Parser");*/
 
-    let function_without_effects = just(Token::Function)
+    let function_without_effects = recursive(|fun| 
+                                          just(Token::Function)
+                                          .then_ignore(just(Token::ParenLeft))
+                                          .then(fun.separated_by(just(Token::Comma)))
+                                          .then_ignore(just(Token::ParenRight))
+                                          .then_ignore(just(Token::FunctionReturn))
+                                             .then(type_list.clone())
+                                             .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
+                                        .or(type_list.clone())
+    );
+
+    /*let function_without_effects = just(Token::Function)
         .then_ignore(just(Token::ParenLeft))
         .then(function_args)
         .then_ignore(just(Token::ParenRight))
         .then_ignore(just(Token::FunctionReturn))
         .then(type_list.clone())
         .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
-        .labelled("Function without Effects Parser");
+        .labelled("Function without Effects Parser");*/
 
     let function = choice((function_with_effects, function_without_effects));
+
 
     let escaped_function = just(Token::ParenLeft)
         .ignore_then(function.clone())
         .then_ignore(just(Token::ParenRight))
         .labelled("Escaped Function Parser");
 
-    let function_or_type_list = choice((function, escaped_function ,type_list, single_type));
+    let function_or_type_list = choice((function,type_list, single_type));
 
     let tuple_or_function = recursive(|tuple| tuple
                           .separated_by(just(Token::Comma))
