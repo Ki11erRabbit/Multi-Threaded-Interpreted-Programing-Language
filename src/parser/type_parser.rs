@@ -74,25 +74,25 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     let single_or_unit = filter_map(|span: Range<usize> , token| match token {
         Token::Identifier(value) => Ok(Type::Single(value)),
         Token::Unit => Ok(Type::Unit),
-        _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
+        _ => Err(Simple::custom(span, format!("Expected identifier or unit, found {:?}", token))),
     })
         .labelled("Single or Unit Type Parser");
 
 
-    let tuple = recursive(|tuple| tuple
+    let tuple = recursive(|tuple| tuple.clone()
                           .separated_by(just(Token::Comma))
                           .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                        .map(|types| Type::Tuple(types))
-                                    .or(type_parser())
+                          .map(|types| {Type::Tuple(types)})
+                                    .or(tuple)
     ).labelled("Tuple or Single Type Parser");
     //let empty_tuple = just(Token::Unit).map(|_| Type::Unit);
     
     //let tuple = choice((empty_tuple, tuple_or_single));
 
-    let type_list = recursive(|tg| tg.repeated()
+    let type_list = recursive(|tg| tg.clone().repeated()
                               .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
                             .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
-                            .or(type_parser()));
+                            .or(tg));
                                
     
     
@@ -113,9 +113,9 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                                           .then_ignore(just(Token::ParenRight))
                                           .then(function_effects.clone())
                                           .then_ignore(just(Token::FunctionReturn))
-                                          .then(type_list.clone().or(fun))
+                                          .then(fun.clone())
                                           .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
-                                        .or(type_parser())
+                                        .or(fun)
     );
 
     let function_without_effects = recursive(|fun| 
@@ -124,9 +124,9 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                                           .then(fun.clone().separated_by(just(Token::Comma)))
                                           .then_ignore(just(Token::ParenRight))
                                           .then_ignore(just(Token::FunctionReturn))
-                                             .then(type_list.clone().or(fun))
+                                          .then(fun.clone())
                                              .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
-                                        .or(type_parser())
+                                        .or(fun)
     );
 
 
