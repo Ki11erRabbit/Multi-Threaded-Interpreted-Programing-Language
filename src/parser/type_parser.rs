@@ -78,27 +78,64 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                           .separated_by(just(Token::Comma))
                           .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
                         .map(|types| Type::Tuple(types))
-                                    .or(single_type.clone()));
+                                    .or(single_type.clone())
+    );
     let empty_tuple = just(Token::ParenLeft).then(just(Token::ParenRight)).map(|_| Type::Tuple(vec![]));
     
     let tuple = choice((empty_tuple, tuple_or_single));
 
-
-    let type_list = just(Token::Identifier("<".to_string()))
-        .ignore_then(type_parser().separated_by(just(Token::Comma)))
-        .then_ignore(just(Token::Identifier(">".to_string())))
-        .map(|types| types);
-
     let type_list = tuple.clone()
         .separated_by(just(Token::Comma))
-        .delimited_by(just(Token::Identifier(">".to_string())), just(Token::Identifier(">".to_string())));
+        .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())));
 
     let type_group = filter_map(|span, token| match token {
         Token::Identifier(value) => Ok(Type::Single(value)),
         _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
-    }).then(type_list).map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});
+    }).then(type_list.clone()).map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});
+
+    /*let type_group = recursive(|tg|
+                               filter_map(|span, token| match token {
+                                      Token::Identifier(value) => Ok(Type::Single(value)),
+                                      _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
+                               })
+                               .then(tg
+                                     .separated_by(just(Token::Comma))
+                                     .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
+                                     .map(|vec| vec))
+                            .map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters})
+    );*/
+
+
+    /*let type_group = recursive(|tg| tg
+        .then(
+            filter_map(|span, token| match token {
+                    Token::Identifier(value) => Ok(Type::Single(value)),
+                    _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
+            })
+        )
+                               .then(type_list.clone())
+                            .map(|((name, parameters), parameters2)| Type::TypeList{name: Box::new(name), parameters: parameters2}));*/
+                               
+                               
+                               
     
-    choice((type_group, tuple))
+    let basic_types = choice((type_group, tuple));
+    
+    let function_args = basic_types.clone()
+        .separated_by(just(Token::Comma));
+
+    let function_effects = type_list;
+
+    let function = just(Token::Function)
+        .then_ignore(just(Token::ParenLeft))
+        .then(function_args)
+        .then_ignore(just(Token::ParenRight))
+        .then(function_effects)
+        .then_ignore(just(Token::FunctionReturn))
+        .then(basic_types.clone())
+        .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)});
+
+    choice((function, basic_types))
 
 }
 
@@ -178,17 +215,17 @@ mod type_parser_tests {
     }
 
     #[test]
-    fn test_long_type_list() {
+    fn test_nested_type_list() {
         let result = type_parser().parse(lexer("List<List<Int>>").unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
-            assert!(false, "Failed to parse long type list: List<List<Int>>");
+            assert!(false, "Failed to parse nested type list: List<List<Int>>");
         }
 
         let result = result.unwrap();
 
-        assert_eq!(result, Type::TypeList { name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::TypeList { name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::Single("Int".to_string())] }] }, "Failed to parse long type list: List<List<Int>>");
+        assert_eq!(result, Type::TypeList { name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::TypeList { name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::Single("Int".to_string())] }] }, "Failed to parse nested type list: List<List<Int>>");
     }
     
 
