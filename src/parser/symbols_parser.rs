@@ -565,7 +565,6 @@ pub fn identifiers() -> impl Parser<char, String, Error = Simple<char>> {
         .map(|s| s);
 
 
-    let identifier = select!{
 
     let identifier = valid_identifier.validate(|s, span, emit| {
         match s.as_str() {
