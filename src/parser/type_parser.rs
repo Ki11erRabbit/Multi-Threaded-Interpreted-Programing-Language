@@ -83,13 +83,23 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     
     let tuple = choice((empty_tuple, tuple_or_single));
 
-    let type_group = recursive(|tg| tg
+
+    let type_list = just(Token::Identifier("<".to_string()))
+        .ignore_then(type_parser().separated_by(just(Token::Comma)))
+        .then_ignore(just(Token::Identifier(">".to_string())))
+        .map(|types| types);
+
+    let type_list = tuple.clone()
         .separated_by(just(Token::Comma))
-                               .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string())))
-                               .map(|vec: Vec<Type>| Type::TypeList { name: Box::new(vec[0].clone()), parameters: vec[1..].to_vec() })
-                            .or(tuple.clone()));
-                          
-    type_group
+        .delimited_by(just(Token::Identifier(">".to_string())), just(Token::Identifier(">".to_string())));
+
+    let type_group = filter_map(|span, token| match token {
+        Token::Identifier(value) => Ok(Type::Single(value)),
+        _ => Err(Simple::custom(span, format!("Expected identifier, found {:?}", token))),
+    }).then(type_list).map(|(name, parameters)| Type::TypeList{name: Box::new(name), parameters});
+    
+    choice((type_group, tuple))
+
 }
 
 
