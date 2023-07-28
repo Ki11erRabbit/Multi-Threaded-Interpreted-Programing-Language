@@ -6,9 +6,9 @@ use std::sync::Mutex;
 use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::comp::PartialEq;
 
-
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone,Eq, Hash)]
 pub enum Type {
     TypeList {
         name: Box<Type>,
@@ -23,6 +23,30 @@ pub enum Type {
     Tuple(Vec<Type>),
     Unit,
 }
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Rhs) -> Bool {
+        match (self, other) {
+            (Type::Single(a), Type::Single(b)) => {
+                match (&a, &b) {
+                    ("Any", _) => true,
+                    (_, "Any") => true,
+                    _ => a == b,
+                }
+            },
+            (Type::Tuple(a), Type::Tuple(b)) => a == b,
+            (Type::Function{parameters: a, effects: b, return_type: c}, Type::Function{parameters: d, effects: e, return_type: f}) => a == d && b == e && c == f,
+            (Type::TypeList{name: a, parameters: b}, Type::TypeList{name: c, parameters: d}) => a == c && b == d,
+            (Type::Unit, Type::Unit) => true,
+            _ => false,
+        }
+    }
+
+    fn ne(&self, other: &Rhs) -> bool {
+        !self.eq(other)
+    }
+}
+    
 
 
 impl fmt::Display for Type {

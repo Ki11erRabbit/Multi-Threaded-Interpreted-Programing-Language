@@ -6,7 +6,37 @@ use crate::types::{ValuePtr, Type, Value};
 
 
 //TODO: Add a variable type that allows us to type a variable so we can make it so that variable types can be checked.
+pub struct Variable<'a> {
+    the_type: Option<Type>,
+    value: ValuePtr<'a>,
+}
 
+impl Variable<'_> {
+    pub fn is_mutable(&self) -> bool {
+        match self.value {
+            ValuePtr::Mut(_) => true,
+            ValuePtr::Immu() => false,
+        }
+    }
+}
+
+impl <'a>Variable<'a> {
+    pub fn set_value(&mut self, value: Value<'a>) {
+        if self.the_type.get_type() != value.get_type() {
+            panic!("Tried to assign a value of the wrong type to a variable");
+        }
+
+        match self.value {
+            ValuePtr::Mut(ref mut value_ptr) => {
+                *value_ptr = value;
+            }
+            ValuePtr::Immu() => {
+                self.value = ValuePtr::new_immu(value);
+            }
+        }
+    }
+    //TODO: Add function that allows us to bind generics to a variable
+}
 
 /// This represents a typeclass implementation.
 /// It contains a Type to allow us to type check and a hashmap of functions.
@@ -44,9 +74,9 @@ pub struct Interpreter<'a> {
     typeclass_symbol_table: Arc<RwLock<HashMap<Type, TypeClass<'a>>>>,
     symbol_table_to_typeclass: Arc<RwLock<HashMap<String, Type>>>,
     valid_typeclasses: Arc<RwLock<HashMap<Type, Vec<Type>>>>,
-    local_global_variables: HashMap<String, ValuePtr<'a>>,
-    shared_global_variables: Arc<RwLock<HashMap<String, ValuePtr<'a>>>>,
-    mutable_global_variables: Arc<RwLock<HashMap<String, Arc<Mutex<ValuePtr<'a>>>>>>,
+    local_global_variables: HashMap<String, Variable<'a>>,
+    shared_global_variables: Arc<RwLock<HashMap<String, Variable<'a>>>>,
+    mutable_global_variables: Arc<RwLock<HashMap<String, Arc<Mutex<Variable<'a>>>>>>,
 }
 
 
@@ -85,7 +115,7 @@ impl<'a> Interpreter<'a> {
         self.function_symbol_table.write().unwrap().insert(name.to_string(), value);
     }
 
-    pub fn set_value(&mut self, name: &str, function_variables: &mut HashMap<String, ValuePtr<'a>>, value: Value<'a>) {
+    pub fn set_value(&mut self, name: &str, function_variables: &mut HashMap<String, Variable<'a>>, value: Value<'a>) {
         if self.mutable_global_variables.read().unwrap().contains_key(name) {
             loop {
                 match self.mutable_global_variables.try_write() {
@@ -105,12 +135,17 @@ impl<'a> Interpreter<'a> {
         else if self.shared_global_variables.read().unwrap().contains_key(name) {
             panic!("Tried to assign to a shared global variable");
         }
-        else if self.local_global_variables.contains_key(name) {
+        else if let Some(variable) = self.local_global_variables.get_mut(name) {
             //change it so that we check the value of the variable and see if it is mutable or not
-            self.local_global_variables.insert(name.to_string(), ValuePtr::new_mut(value));
+            if variable.is_mutable() {
+                variable.set_value(value);
+            }
+            else {
+                panic!("Tried to assign to an immutable variable");
+            }
         }
-        else if function_variables.contains_key(name) {
-            function_variables.insert(name.to_string(), ValuePtr::new_mut(value));
+        else if let Some(variable) = function_variables.get_mut(name) {
+            variable.set_value(value);
         }
         else {
             panic!("Tried to assign to a variable that doesn't exist");
