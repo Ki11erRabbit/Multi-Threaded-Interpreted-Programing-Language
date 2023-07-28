@@ -1,11 +1,13 @@
 use chumsky::prelude::*;
 
-use crate::parser::lexer::{Token, lexer};
+use crate::parser::lexer::{Token};
+use crate::types::Type;
+
 
 use std::ops::Range;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+/*#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     TypeList {
         name: Box<Type>,
@@ -66,62 +68,6 @@ impl fmt::Display for Type {
         }
     }
 
-}
-/*pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
-
-    let everything = recursive(|ev|
-                               choice((
-                                   //Tuples
-                                   recursive(|tuple| tuple
-                                             .separated_by(just(Token::Comma))
-                                             .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                                             .map(|types| Type::Tuple(types))
-                                             ).labelled("Tuple Parser"),
-                                   //Type Lists
-                                   recursive(|tl| tl.repeated()
-                                             .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                                             .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
-                                             ).labelled("Type List Parser"),
-                                   //Functions
-                                   choice((
-                                       //Functions with effects
-                                       recursive(|fun|
-                                                 just(Token::Function)
-                                                 .then_ignore(just(Token::ParenLeft))
-                                                 .then(fun.clone().separated_by(just(Token::Comma)))
-                                                 .then_ignore(just(Token::ParenRight))
-                                                 .then(ev.clone()
-                                                       .separated_by(just(Token::Comma))
-                                                    .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string()))
-                                                    ))
-                                                 .then_ignore(just(Token::FunctionReturn))
-                                                 .then(fun.clone())
-                                                 .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
-                                                 ).labelled("Function with Effects Parser"),
-                                       //Functions without effects
-                                       recursive(|fun|
-                                                 just(Token::Function)
-                                                 .then_ignore(just(Token::ParenLeft))
-                                                 .then(fun.clone().separated_by(just(Token::Comma)))
-                                                 .then_ignore(just(Token::ParenRight))
-                                                 .then_ignore(just(Token::FunctionReturn))
-                                                 .then(fun.clone())
-                                                 .map(|((_, parameters), return_type)| Type::Function{parameters, effects: Vec::new(), return_type: Box::new(return_type)})
-                                                 ).labelled("Function without Effects Parser"),
-                                   )).labelled("Function Parser"),
-                               ))
-                            .or(filter_map(|span: Range<usize> , token| match token {
-                                Token::Identifier(value) => Ok(Type::Single(value)),
-                                Token::Unit => Ok(Type::Unit),
-                                _ => Err(Simple::custom(span, format!("Expected identifier or unit, found {:?}", token))),
-                            })
-                                .labelled("Single or Unit Type Parser"))
-    ).labelled("Everything Parser");
-
-    
-                               
-    everything
-    
 }*/
 
 pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
@@ -165,130 +111,7 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                           .labelled("Function without Effects Parser")
                   ))
                       )))
-                      
-                      
-                  
-
 }
-
-/*pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
-
-    let single_or_unit = filter_map(|span: Range<usize> , token| match token {
-        Token::Identifier(value) => Ok(Type::Single(value)),
-        Token::Unit => Ok(Type::Unit),
-        _ => Err(Simple::custom(span, format!("Expected identifier or unit, found {:?}", token))),
-    })
-        .labelled("Single or Unit Type Parser");
-
-
-    let tuple = recursive(|tuple| tuple.clone()
-                          .separated_by(just(Token::Comma))
-                          .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                          .map(|types| {Type::Tuple(types)})
-                                    .or(single_or_unit.clone())
-    ).labelled("Tuple or Single Type Parser");
-    //let empty_tuple = just(Token::Unit).map(|_| Type::Unit);
-    
-    //let tuple = choice((empty_tuple, tuple_or_single));
-
-    let type_list = recursive(|tg| tg.clone().repeated()
-                              .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                            .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
-                            .or(tuple.clone()));
-                               
-    
-    
-    
-    /*let function_args = type_list.clone()
-        .separated_by(just(Token::Comma));*/
-
-    let function_effects = type_list.clone()
-        .separated_by(just(Token::Comma))
-        .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string()))
-        );
-
-
-    let function_with_effects = recursive(|fun|
-                                          just(Token::Function)
-                                          .then_ignore(just(Token::ParenLeft))
-                                          .then(fun.clone().separated_by(just(Token::Comma)))
-                                          .then_ignore(just(Token::ParenRight))
-                                          .then(function_effects.clone())
-                                          .then_ignore(just(Token::FunctionReturn))
-                                          .then(fun.clone().or(type_list.clone()))
-                                          .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
-                                        .or(type_list.clone())
-    );
-
-    let function_without_effects = recursive(|fun| 
-                                          just(Token::Function)
-                                          .then_ignore(just(Token::ParenLeft))
-                                          .then(fun.clone().separated_by(just(Token::Comma)))
-                                          .then_ignore(just(Token::ParenRight))
-                                          .then_ignore(just(Token::FunctionReturn))
-                                          .then(fun.clone().or(type_list.clone()))
-                                             .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
-                                        .or(type_list.clone())
-    );
-
-
-    let function = choice((function_with_effects, function_without_effects));
-
-    
-    //choice((tuple,function, type_list))
-
-    let escaped_function = just(Token::ParenLeft)
-        .ignore_then(function.clone())
-        .then_ignore(just(Token::ParenRight))
-        .labelled("Escaped Function Parser");
-
-    let function_or_type_list = choice((function,escaped_function,type_list, single_or_unit));
-
-    let tuple_or_function = recursive(|tuple| tuple
-                          .separated_by(just(Token::Comma))
-                          .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                        .map(|types| Type::Tuple(types))
-                                      .or(function_or_type_list)
-    ).labelled("Tuple or Function Type Parser");
-
-    
-    let type_list = recursive(|tg| tg.repeated()
-                              .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
-                            .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
-                              .or(tuple_or_function));
-
-    
-    let function_with_effects = recursive(|fun|
-                                          just(Token::Function)
-                                          .then_ignore(just(Token::ParenLeft))
-                                          .then(fun.clone().separated_by(just(Token::Comma)))
-                                          .then_ignore(just(Token::ParenRight))
-                                          .then(function_effects.clone())
-                                          .then_ignore(just(Token::FunctionReturn))
-                                          .then(fun.clone().or(type_list.clone()))
-                                          .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
-                                        .or(type_list.clone())
-    );
-
-    let function_without_effects = recursive(|fun| 
-                                          just(Token::Function)
-                                          .then_ignore(just(Token::ParenLeft))
-                                          .then(fun.clone().separated_by(just(Token::Comma)))
-                                          .then_ignore(just(Token::ParenRight))
-                                          .then_ignore(just(Token::FunctionReturn))
-                                          .then(fun.clone().or(type_list.clone()))
-                                             .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
-                                        .or(type_list.clone())
-    );
-
-
-    let function = choice((function_with_effects, function_without_effects));
-    
-    function
-
-    //function_or_type_list
-}*/
-
 
 #[cfg(test)]
 mod type_parser_tests {
@@ -634,14 +457,14 @@ mod type_parser_tests {
 
         if lexer_result.is_err() {
             eprintln!("{:?}", lexer_result);
-            assert!(false, "Failed to lex mixed type statement: fn((Int,(List Int))) -> (Int, Int)");
+            assert!(false, "Failed to lex mixed type: fn((Int,(List Char))) -> (Float, Char)");
         }
 
         let result = type_parser().parse(lexer_result.unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
-            assert!(false, "Failed to parse mixed type statement: fn((Int,(List Int))) -> (Int, Int)");
+            assert!(false, "Failed to parse mixed type: fn((Int,(List Char))) -> (Float, Char)");
         }
 
         let result = result.unwrap();
@@ -649,19 +472,17 @@ mod type_parser_tests {
         assert_eq!(result, Type::Function {
             parameters: vec![Type::Tuple(vec![
                 Type::Single("Int".to_string()),
-                Type::Tuple(vec![
-                    Type::TypeList {
-                        name: Box::new(Type::Single("List".to_string())),
-                        parameters: vec![Type::Single("Char".to_string())]
-                    }
-                ])
+                Type::TypeList {
+                    name: Box::new(Type::Single("List".to_string())),
+                    parameters: vec![Type::Single("Char".to_string())]
+                }
             ])],
             effects: vec![],
             return_type: Box::new(Type::Tuple(vec![
                 Type::Single("Float".to_string()),
                 Type::Single("Char".to_string())
             ]))
-        }, "Failed to parse mixed type statement: x: fn((Int,(List Int))) -> (Int, Int)");
+        }, "Failed to parse mixed type: fn((Int,(List Char))) -> (Float, Char)");
     }
 
 }
@@ -773,36 +594,36 @@ mod type_statement_parser {
 
     #[test]
     fn test_mixed_type_statement() {
-        let lexer_result = lexer(": fn((String,(List Int))) -> (Char, Float)");
+        let lexer_result = lexer(": fn((Int,(List Char))) -> (Float, Char)");
 
         if lexer_result.is_err() {
             eprintln!("{:?}", lexer_result);
-            assert!(false, "Failed to lex mixed type statement: x: fn((String,(List Int))) -> (Char, Float)");
+            assert!(false, "Failed to lex mixed type statement: fn((Int,(List Char))) -> (Float, Char)");
         }
 
         let result = type_statement_parser().parse(lexer_result.unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
-            assert!(false, "Failed to parse mixed type statement: x: fn((String,(List Int))) -> (Char, Float)");
+            assert!(false, "Failed to parse mixed type statement: fn((Int,(List Char))) -> (Float, Char)");
         }
 
         let result = result.unwrap();
 
         assert_eq!(result, Type::Function {
             parameters: vec![Type::Tuple(vec![
-                Type::Single("String".to_string()),
-                Type::Tuple(vec![
-                    Type::Single("List".to_string()),
-                    Type::Single("Int".to_string())
-                ])
+                Type::Single("Int".to_string()),
+                Type::TypeList {
+                    name: Box::new(Type::Single("List".to_string())),
+                    parameters: vec![Type::Single("Char".to_string())]
+                }
             ])],
             effects: vec![],
             return_type: Box::new(Type::Tuple(vec![
-                Type::Single("Char".to_string()),
-                Type::Single("Float".to_string())
+                Type::Single("Float".to_string()),
+                Type::Single("Char".to_string())
             ]))
-        }, "Failed to parse mixed type statement: x: fn((String,(List Int))) -> (Char, Float)");
+        }, "Failed to parse mixed type statement: x: fn((Int,(List Char))) -> (Float, Char)");
     }
 
 }

@@ -1068,7 +1068,7 @@ mod lexer_tests {
 
         let tokens = result.unwrap();
 
-        assert_eq!(tokens, vec![Token::Identifier("a".to_string()), Token::WhiteSpace, Token::Assignment, Token::WhiteSpace, Token::Number("1".to_string())], "Token not assignment");
+        assert_eq!(tokens, vec![Token::Identifier("a".to_string()), Token::Assignment, Token::Number("1".to_string())], "Token not assignment");
     }
 
     #[test]
@@ -1082,7 +1082,7 @@ mod lexer_tests {
 
         let tokens = result.unwrap();
 
-        assert_eq!(tokens, vec![Token::Class, Token::WhiteSpace, Token::Identifier("Monad".to_string()), Token::WhiteSpace, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::CurlyLeft, Token::WhiteSpace, Token::Function, Token::WhiteSpace, Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::Identifier("a".to_string()), Token::Comma, Token::WhiteSpace, Token::Function, Token::WhiteSpace, Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::WhiteSpace, Token::FunctionReturn, Token::WhiteSpace, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::Identifier("b".to_string()), Token::ParenRight, Token::WhiteSpace, Token::FunctionReturn, Token::WhiteSpace, Token::Identifier("m".to_string()), Token::WhiteSpace, Token::Identifier("b".to_string()), Token::WhiteSpace, Token::CurlyRight], "Token not type class");
+        assert_eq!(tokens, vec![Token::Class, Token::Identifier("Monad".to_string()), Token::Identifier("m".to_string()), Token::CurlyLeft, Token::Function, Token::ParenLeft, Token::Identifier(">>=".to_string()), Token::ParenRight, Token::ParenLeft, Token::Identifier("m".to_string()), Token::Identifier("a".to_string()), Token::Comma, Token::Function, Token::ParenLeft, Token::Identifier("a".to_string()), Token::ParenRight, Token::FunctionReturn, Token::Identifier("m".to_string()), Token::Identifier("b".to_string()), Token::ParenRight, Token::FunctionReturn, Token::Identifier("m".to_string()), Token::Identifier("b".to_string()), Token::CurlyRight], "Token not type class");
     }
     
     /*
