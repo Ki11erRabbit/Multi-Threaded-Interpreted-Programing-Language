@@ -125,6 +125,53 @@ impl fmt::Display for Type {
 }*/
 
 pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
+    recursive(|ev|
+              choice((
+                  filter_map(|span: Range<usize> , token| match token {
+                      Token::Identifier(value) => Ok(Type::Single(value)),
+                      Token::Unit => Ok(Type::Unit),
+                      _ => Err(Simple::custom(span, format!("Expected identifier or unit, found {:?}", token))),
+                  })
+                      .labelled("Single or Unit Type Parser"),
+                  ev.clone()
+                      .separated_by(just(Token::Comma))
+                      .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                      .map(|types| {Type::Tuple(types)})
+                      .labelled("Tuple Parser"),
+                  ev.clone()
+                      .repeated()
+                      .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
+                      .map(|types: Vec<Type>| Type::TypeList{name: Box::new(types[0].clone()), parameters: types[1..].to_owned()})
+                      .labelled("Type List Parser"),
+                  choice((
+                      just(Token::Function)
+                          .then_ignore(just(Token::ParenLeft))
+                          .then(ev.clone().separated_by(just(Token::Comma)))
+                          .then_ignore(just(Token::ParenRight))
+                          .then(ev.clone()
+                                .separated_by(just(Token::Comma))
+                                .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string()))))
+                          .then_ignore(just(Token::FunctionReturn))
+                          .then(ev.clone())
+                          .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
+                          .labelled("Function with Effects Parser"),
+                      just(Token::Function)
+                          .then_ignore(just(Token::ParenLeft))
+                          .then(ev.clone().separated_by(just(Token::Comma)))
+                          .then_ignore(just(Token::ParenRight))
+                          .then_ignore(just(Token::FunctionReturn))
+                          .then(ev.clone())
+                          .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
+                          .labelled("Function without Effects Parser")
+                  ))
+                      )))
+                      
+                      
+                  
+
+}
+
+/*pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
 
     let single_or_unit = filter_map(|span: Range<usize> , token| match token {
         Token::Identifier(value) => Ok(Type::Single(value)),
@@ -240,7 +287,7 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     function
 
     //function_or_type_list
-}
+}*/
 
 
 #[cfg(test)]
