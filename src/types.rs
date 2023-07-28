@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Type {
     TypeList {
         name: Box<Type>,
@@ -209,6 +209,13 @@ impl TypeUtils for &Value<'_> {
 
 pub type ValueImmu<'a> = Rc<Value<'a>>;
 pub type ValueMut<'a> = Rc<RefCell<Value<'a>>>;
+
+#[derive(Debug, Clone)]
+pub enum ValuePtr<'a> {
+    Immu(Rc<Value<'a>>),
+    Mut(Rc<RefCell<Value<'a>>>),
+}
+
 
 pub trait ValueRef {
     fn get_type(&self) -> Type;
