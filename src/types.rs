@@ -31,7 +31,13 @@ impl PartialEq for Type {
                 match (&a, &b) {
                     ("Any", _) => true,
                     (_, "Any") => true,
-                    _ => a == b,
+                    _ => {
+                        if a.len() == 1 || b.len() == 1 {
+                            true
+                        } else {
+                            a == b
+                        }
+                    },
                 }
             },
             (Type::Tuple(a), Type::Tuple(b)) => a == b,

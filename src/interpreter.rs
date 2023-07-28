@@ -5,7 +5,6 @@ use std::sync::{RwLock, Arc, Mutex, TryLockResult, TryLockError};
 use crate::types::{ValuePtr, Type, Value};
 
 
-//TODO: Add a variable type that allows us to type a variable so we can make it so that variable types can be checked.
 pub struct Variable<'a> {
     the_type: Option<Type>,
     value: ValuePtr<'a>,
@@ -63,7 +62,7 @@ impl <'a>TypeClass<'a> {
 }
 
 /// This represents the interpreter's data structure.
-/// There are two symbol tables, one for named functions and one for typeclasses.
+/// There are two symbol tables, one for named functions and one for typeclasses. The typeclass one has double indirection because we don't know the type of a function since there will be multiple implementations,
 /// There is also a hashmap that allows us to lookup the typeclass for a type.
 /// We then we have a hashmap that allows us to lookup the valid typeclasses for a type so we can't implement typeclasses that don't exist.
 /// We then have a hashmap that allows us to lookup global variables. These are either immutable or mutable, But they are all local to the thread. Immutable Variables can't be reassigned.
@@ -71,8 +70,8 @@ impl <'a>TypeClass<'a> {
 /// We then have a hashmap that allows us to lookup mutable global variables. These are all mutable and can be reassigned by any thread. They are however protected by a mutex.
 pub struct Interpreter<'a> {
     function_symbol_table: Arc<RwLock<HashMap<String, Value<'a>>>>,
-    typeclass_symbol_table: Arc<RwLock<HashMap<Type, TypeClass<'a>>>>,
-    symbol_table_to_typeclass: Arc<RwLock<HashMap<String, Type>>>,
+    type_class_symbol_table: Arc<RwLock<HashMap<String, HashMap<Type, Value<'a>>>>>,
+    default_symbol_table: Arc<RwLock<HashMap<String, Value<'a>>>>,
     valid_typeclasses: Arc<RwLock<HashMap<Type, Vec<Type>>>>,
     local_global_variables: HashMap<String, Variable<'a>>,
     shared_global_variables: Arc<RwLock<HashMap<String, Variable<'a>>>>,
@@ -84,25 +83,55 @@ impl Interpreter<'_> {
     pub fn new() -> Interpreter<'static> {
         Interpreter {
             function_symbol_table: Arc::new(RwLock::new(HashMap::new())),
-            typeclass_symbol_table: Arc::new(RwLock::new(HashMap::new())),
-            symbol_table_to_typeclass: Arc::new(RwLock::new(HashMap::new())),
+            type_class_symbol_table: Arc::new(RwLock::new(HashMap::new())),
+            default_symbol_table: Arc::new(RwLock::new(HashMap::new())),
             valid_typeclasses: Arc::new(RwLock::new(HashMap::new())),
             local_global_variables: HashMap::new(),
             shared_global_variables: Arc::new(RwLock::new(HashMap::new())),
             mutable_global_variables: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-
-
 }
 
 impl<'a> Interpreter<'a> {
+
+    /// This function is how we add a new type class as well as their default implementation if there is one
+    pub fn add_typeclass(&mut self, class: Type, functions: Vec<Result<Type,(String, Value<'a>)>>) {
+        let mut table = self.default_symbol_table.write().expect("Interpretrer was not able to be written to");
+
+        let mut func_table = Vec::new();
+        for func in functions {
+            match func {
+                Ok(the_type) => func_table.push(the_type),
+                Err((name, fun)) => {
+                    func_table.push(fun.get_type());
+                    table.insert(name, fun);
+                }
+            }
+        }
+
+        self.valid_typeclasses.write().expect("Interpreter was not able to be written to").insert(class, func_table);
+    }
+
+    pub fn add_typeclass_instance(&mut self, class: Type, functions: Vec<(String, Value<'a>)>) {
+        if !self.valid_typeclasses.read().unwrap().contains_key(&class) {
+            panic!("Tried to add a typeclass instance for a typeclass that doesn't exist");
+        }
+
+        let mut table = self.type_class_symbol_table.write().expect("Interpreter was not able to be written to");
+        for (name, func) in functions {
+            if let Some(ref mut v_table) = table.get_mut(&name) {
+                v_table.insert(class, func);
+            }
+
+        }
+    }
     
     pub fn new_for_thread(& self) -> Interpreter<'a> {
         Interpreter {
             function_symbol_table: self.function_symbol_table.clone(),
-            typeclass_symbol_table: self.typeclass_symbol_table.clone(),
-            symbol_table_to_typeclass: self.symbol_table_to_typeclass.clone(),
+            type_class_symbol_table: self.type_class_symbol_table.clone(),
+            default_symbol_table: self.default_symbol_table.clone(),
             valid_typeclasses: self.valid_typeclasses.clone(),
             local_global_variables: HashMap::new(),
             shared_global_variables: self.shared_global_variables.clone(),
