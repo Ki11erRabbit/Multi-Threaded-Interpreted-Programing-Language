@@ -5,6 +5,8 @@ use std::sync::{RwLock, Arc, Mutex, TryLockResult, TryLockError};
 use crate::types::{ValuePtr, Type, Value};
 
 
+//TODO: Add a variable type that allows us to type a variable so we can make it so that variable types can be checked.
+
 
 /// This represents a typeclass implementation.
 /// It contains a Type to allow us to type check and a hashmap of functions.
@@ -34,7 +36,7 @@ impl <'a>TypeClass<'a> {
 /// There are two symbol tables, one for named functions and one for typeclasses.
 /// There is also a hashmap that allows us to lookup the typeclass for a type.
 /// We then we have a hashmap that allows us to lookup the valid typeclasses for a type so we can't implement typeclasses that don't exist.
-/// We then have a hashmap that allows us to lookup global variables. These are either immutable or mutable, But they are all local to the thread.
+/// We then have a hashmap that allows us to lookup global variables. These are either immutable or mutable, But they are all local to the thread. Immutable Variables can't be reassigned.
 /// We then have a hashmap that allows us to lookup shared global variables. These are all immutable and cannot be reassigned by any thread.
 /// We then have a hashmap that allows us to lookup mutable global variables. These are all mutable and can be reassigned by any thread. They are however protected by a mutex.
 pub struct Interpreter<'a> {
@@ -78,7 +80,45 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn lookup_variable(&self, name: &str, function_variables: &HashMap<String, ValuePtr<'a>>) -> Option<ValuePtr<'a>> {
+
+    pub fn add_function(&'a mut self, name: &str, value: Value<'a>) {
+        self.function_symbol_table.write().unwrap().insert(name.to_string(), value);
+    }
+
+    pub fn set_value(&mut self, name: &str, function_variables: &mut HashMap<String, ValuePtr<'a>>, value: Value<'a>) {
+        if self.mutable_global_variables.read().unwrap().contains_key(name) {
+            loop {
+                match self.mutable_global_variables.try_write() {
+                    TryLockResult::Err(TryLockError::WouldBlock) => {
+                        continue;
+                    }
+                    TryLockResult::Err(TryLockError::Poisoned(_)) => {
+                        panic!("Another thread panicked while holding the lock");
+                    }
+                    TryLockResult::Ok(mut guard) => {
+                        guard.insert(name.to_string(), Arc::new(Mutex::new(ValuePtr::new_mut(value))));
+                        break;
+                    }
+                }
+            }
+        }
+        else if self.shared_global_variables.read().unwrap().contains_key(name) {
+            panic!("Tried to assign to a shared global variable");
+        }
+        else if self.local_global_variables.contains_key(name) {
+            //change it so that we check the value of the variable and see if it is mutable or not
+            self.local_global_variables.insert(name.to_string(), ValuePtr::new_mut(value));
+        }
+        else if function_variables.contains_key(name) {
+            function_variables.insert(name.to_string(), ValuePtr::new_mut(value));
+        }
+        else {
+            panic!("Tried to assign to a variable that doesn't exist");
+        }
+        
+    }
+
+    pub fn get_value(&self, name: &str, function_variables: &HashMap<String, ValuePtr<'a>>) -> Option<ValuePtr<'a>> {
         if let Some(variable) = function_variables.get(name) {
             return Some(variable.clone());
         }
@@ -109,5 +149,7 @@ impl<'a> Interpreter<'a> {
         None
         
     }
+
+    
 }
 

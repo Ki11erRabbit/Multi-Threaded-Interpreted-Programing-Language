@@ -216,6 +216,14 @@ pub enum ValuePtr<'a> {
     Mut(Rc<RefCell<Value<'a>>>),
 }
 
+impl <'a>ValuePtr<'a> {
+    pub fn new_immu(value: Value<'a>) -> Self {
+        ValuePtr::Immu(Rc::new(value))
+    }
+    pub fn new_mut(value: Value<'a>) -> Self {
+        ValuePtr::Mut(Rc::new(RefCell::new(value)))
+    }
+}
 
 pub trait ValueRef {
     fn get_type(&self) -> Type;
