@@ -2,17 +2,20 @@
 use std::collections::HashMap;
 use std::sync::{RwLock, Arc, Mutex, TryLockResult, TryLockError};
 use std::thread;
+use std::thread::JoinHandle;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use crate::types::{ValuePtr, Type, Value,TypeUtils, ValueRef};
 
 #[derive(Debug, Clone)]
-pub struct Variable<'a> {
+pub struct Variable {
     the_type: Option<Type>,
-    value: ValuePtr<'a>,
+    value: ValuePtr,
 }
 
-impl Variable<'_> {
-    pub fn new(value: ValuePtr<'static>) -> Variable<'static> {
+impl Variable {
+    pub fn new(value: ValuePtr) -> Variable {
         Variable {
             the_type: Some(value.get_type()),
             value,
@@ -27,8 +30,8 @@ impl Variable<'_> {
     }
 }
 
-impl <'a>Variable<'a> {
-    pub fn set_value(&mut self, value: Value<'a>) {
+impl Variable {
+    pub fn set_value(&mut self, value: Value) {
         if self.the_type.get_type() != value.get_type() {
             panic!("Tried to assign a value of the wrong type to a variable");
         }
@@ -43,7 +46,7 @@ impl <'a>Variable<'a> {
         }
     }
 
-    pub fn get_value(&self) -> ValuePtr<'a> {
+    pub fn get_value(&self) -> ValuePtr {
         match self.value {
             ValuePtr::Mut(ref value_ptr) => {
                 ValuePtr::new_mut(value_ptr.clone())
@@ -59,13 +62,13 @@ impl <'a>Variable<'a> {
 
 /// This represents a typeclass implementation.
 /// It contains a Type to allow us to type check and a hashmap of functions.
-pub struct TypeClass<'a> {
+pub struct TypeClass {
     types: Type,
-    functions: HashMap<Type, Value<'a>>,//change i32 to a function ast
+    functions: HashMap<Type, Value>,//change i32 to a function ast
 }
 
-impl TypeClass<'_> {
-    pub fn new(types: Type, functions: HashMap<Type, Value<'static>>) -> TypeClass<'static> {
+impl TypeClass {
+    pub fn new(types: Type, functions: HashMap<Type, Value>) -> TypeClass {
         TypeClass {
             types,
             functions,
@@ -73,8 +76,8 @@ impl TypeClass<'_> {
     }
 }
 
-impl <'a>TypeClass<'a> {
-    pub fn get_function(&mut self, name: &Type) -> Option<&Value<'a>> {
+impl TypeClass {
+    pub fn get_function(&mut self, name: &Type) -> Option<&Value> {
         self.functions.get(name)
     }
     
@@ -88,19 +91,20 @@ impl <'a>TypeClass<'a> {
 /// We then have a hashmap that allows us to lookup global variables. These are either immutable or mutable, But they are all local to the thread. Immutable Variables can't be reassigned.
 /// We then have a hashmap that allows us to lookup shared global variables. These are all immutable and cannot be reassigned by any thread.
 /// We then have a hashmap that allows us to lookup mutable global variables. These are all mutable and can be reassigned by any thread. They are however protected by a mutex.
-pub struct Interpreter<'a> {
-    function_symbol_table: Arc<RwLock<HashMap<String, Value<'a>>>>,
-    type_class_symbol_table: Arc<RwLock<HashMap<String, HashMap<Type, Value<'a>>>>>,
-    default_symbol_table: Arc<RwLock<HashMap<String, Value<'a>>>>,
+#[derive(Debug, Clone)]
+pub struct Interpreter {
+    function_symbol_table: Arc<RwLock<HashMap<String, Value>>>,
+    type_class_symbol_table: Arc<RwLock<HashMap<String, HashMap<Type, Value>>>>,
+    default_symbol_table: Arc<RwLock<HashMap<String, Value>>>,
     valid_typeclasses: Arc<RwLock<HashMap<Type, Vec<Type>>>>,
-    local_global_variables: HashMap<String, Variable<'a>>,
-    shared_global_variables: Arc<RwLock<HashMap<String, Variable<'a>>>>,
-    mutable_global_variables: Arc<RwLock<HashMap<String, Arc<Mutex<Variable<'a>>>>>>,
+    local_global_variables: HashMap<String, Variable>,
+    shared_global_variables: Arc<RwLock<HashMap<String, Variable>>>,
+    mutable_global_variables: Arc<RwLock<HashMap<String, Arc<Mutex<Variable>>>>>,
 }
 
 
-impl Interpreter<'_> {
-    pub fn new() -> Interpreter<'static> {
+impl Interpreter {
+    pub fn new() -> Interpreter {
         Interpreter {
             function_symbol_table: Arc::new(RwLock::new(HashMap::new())),
             type_class_symbol_table: Arc::new(RwLock::new(HashMap::new())),
@@ -113,10 +117,10 @@ impl Interpreter<'_> {
     }
 }
 
-impl<'a> Interpreter<'a> {
+impl Interpreter {
 
     /// This function is how we add a new type class as well as their default implementation if there is one
-    pub fn add_typeclass(&mut self, class: Type, functions: Vec<Result<Type,(String, Value<'a>)>>) {
+    pub fn add_typeclass(&mut self, class: Type, functions: Vec<Result<Type,(String, Value)>>) {
         let mut table = self.default_symbol_table.write().expect("Interpretrer was not able to be written to");
 
         let mut func_table = Vec::new();
@@ -133,7 +137,7 @@ impl<'a> Interpreter<'a> {
         self.valid_typeclasses.write().expect("Interpreter was not able to be written to").insert(class, func_table);
     }
 
-    pub fn add_typeclass_instance(&mut self, class: Type, functions: Vec<(String, Value<'a>)>) {
+    pub fn add_typeclass_instance(&mut self, class: Type, functions: Vec<(String, Value)>) {
         if !self.valid_typeclasses.read().unwrap().contains_key(&class) {
             panic!("Tried to add a typeclass instance for a typeclass that doesn't exist");
         }
@@ -147,7 +151,7 @@ impl<'a> Interpreter<'a> {
         }
     }
     
-    pub fn new_for_thread(& self) -> Interpreter<'a> {
+    pub fn new_for_thread(& self) -> Interpreter {
         Interpreter {
             function_symbol_table: self.function_symbol_table.clone(),
             type_class_symbol_table: self.type_class_symbol_table.clone(),
@@ -160,11 +164,11 @@ impl<'a> Interpreter<'a> {
     }
 
 
-    pub fn add_function(&'a mut self, name: &str, value: Value<'a>) {
+    pub fn add_function(& mut self, name: &str, value: Value) {
         self.function_symbol_table.write().unwrap().insert(name.to_string(), value);
     }
 
-    pub fn set_value(&mut self, name: &str, function_variables: &mut HashMap<String, Variable<'a>>, value: Value<'a>) {
+    pub fn set_value(&mut self, name: &str, function_variables: &mut HashMap<String, Variable>, value: Value) {
         if self.mutable_global_variables.read().unwrap().contains_key(name) {
             unimplemented!("Need to implement mutable global variables");
             /*loop {
@@ -203,7 +207,7 @@ impl<'a> Interpreter<'a> {
         
     }
 
-    pub fn get_value(&self, name: &str, function_variables: &HashMap<String, ValuePtr<'a>>) -> Option<ValuePtr<'a>> {
+    pub fn get_value(&self, name: &str, function_variables: &HashMap<String, ValuePtr>) -> Option<ValuePtr> {
         if let Some(variable) = function_variables.get(name) {
             return Some(variable.clone());
         }
@@ -235,12 +239,12 @@ impl<'a> Interpreter<'a> {
         
     }
 
-    fn function_caller(&mut self, function_name: &str, function: Value<'a>, arguments: Vec<ValuePtr<'a>>) -> Value<'a> {
+    fn function_caller(& mut self, function_name: &str, function: Value, arguments: Vec<& mut ValuePtr>) -> Value {
         match function {
             Value::Function(threaded, args, effects, ret_type, variable_map, body) => {
                 let mut variable_map = variable_map;
                 let mut pass_by_ref = false;
-                for ((name, the_type), arg) in args.iter().zip(arguments) {
+                for ((name, the_type),mut arg) in args.iter().zip(arguments.into_iter()) {
                     //TODO: add in ablity to bind generics to types
                     if the_type.get_type() != arg.get_type() {
                         panic!("Tried to call function {} with argument of type {} when it expected type {}", function_name, arg.get_type(), the_type.get_type());
@@ -257,11 +261,12 @@ impl<'a> Interpreter<'a> {
                     if pass_by_ref {
                         panic!("Tried to call a threaded function with a reference");
                     }
-                    let mut interpreter = self.new_for_thread();
+                    let mut interpreter = self.clone();
 
-                    let handle = thread::spawn(move || {
+
+                    let handle = Arc::new(RwLock::new(thread::spawn(move || {
                         return interpreter.evaluate_block(&mut variable_map, &body);
-                    });
+                    })));
 
                     return Value::create_promise(handle, ret_type.clone());
 
@@ -277,28 +282,29 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn call_function(&mut self, name: &str, arguments: Vec<ValuePtr<'a>>, local_variables: HashMap<String, ValuePtr<'a>>) -> Value<'a> {
+    pub fn call_function(&mut self, name: &str, arguments: Vec<&mut ValuePtr>, local_variables: HashMap<String, ValuePtr>) -> Value {
 
-        if let Some(function) = self.function_symbol_table.read().expect("Unable to read interpreter").get(name) {
-            return self.function_caller(name, function.clone(), arguments);
+        let function = if let Some(function) = self.function_symbol_table.read().expect("Unable to read interpreter").get(name) {
+            function.clone()
         }
         else if let Some(function) = self.type_class_symbol_table.read().expect("Unable to read interpreter").get(name).unwrap_or(&HashMap::new()).get(&arguments[0].get_type()) {
-            return self.function_caller(name, function.clone(), arguments);
+            function.clone()
 
         }
         else if let Some(function) = self.default_symbol_table.read().expect("Unable to read interpreter").get(name) {
-            return self.function_caller(name, function.clone(), arguments);
+            function.clone()
         }
         else if let Some(function) = self.check_if_function(name, &local_variables) {
-            return self.function_caller(name, function.clone(), arguments);
+            function
         }
         else {
             panic!("Either tried to call a function that doesn't exist or tried to call something that isn't a function: {}", name);
-        }
+        };
+        return self.function_caller(name, function, arguments);
 
     }
 
-    fn check_if_function(&self, name: &str, local_variables: &HashMap<String, ValuePtr<'a>>) -> Option<Value<'a>> {
+    fn check_if_function(&self, name: &str, local_variables: &HashMap<String, ValuePtr>) -> Option<Value> {
         if let Some(function) = local_variables.get(name) {
             return Some(function.get_value().clone());
         }
@@ -307,7 +313,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn evaluate_block(&mut self, function_variables: &mut HashMap<String, Value<'a>>, block: &String) -> Value<'a> {
+    fn evaluate_block(&mut self, function_variables: &mut HashMap<String, Value>, block: &String) -> Value {
         unimplemented!("Interpretation of functions is not yet implemented");
     }
 

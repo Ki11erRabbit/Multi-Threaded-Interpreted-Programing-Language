@@ -2,12 +2,16 @@
 
 
 use std::collections::HashMap;
-use std::sync::{Arc,Mutex};
+use std::sync::{Arc,RwLock};
 use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::cmp::PartialEq;
 use std::thread::JoinHandle;
+
+use core::marker::{Sync,Send};
+
+
 
 #[derive(Debug, Clone,Eq, Hash)]
 pub enum Type {
@@ -174,7 +178,7 @@ impl TypeUtils for &Option<Type> {
     }
 }
 
-impl TypeUtils for Option<Value<'_>> {
+impl TypeUtils for Option<Value> {
     fn get_type(&self) -> Type {
         match self {
             Some(v) => v.get_type(),
@@ -190,7 +194,7 @@ impl TypeUtils for Option<Value<'_>> {
     }
 }
 
-impl TypeUtils for &Option<Value<'_>> {
+impl TypeUtils for &Option<Value> {
     fn get_type(&self) -> Type {
         match self {
             Some(v) => v.get_type(),
@@ -215,38 +219,54 @@ pub enum AlgebraicType {
 }
 
 #[derive(Debug)]
-pub enum Value<'a> {
+pub enum Value {
     Int(i64),
     UInt(u64),
     Float(f64),
     Char(char),
     Byte(u8),
-    List(Vec<Value<'a>>, Type),
-    Vector(&'a [Value<'a>], Type),
-    Tuple(Vec<Value<'a>>),
+    List(Vec<Value>, Type),
+    //Vector(Rc<RefCell<[Value]>>, Type),
+    Tuple(Vec<Value>),
     Function(bool,//Will We Spawn a new thread
         Vec<(String, Option<Type>)>,//Mapping of variable to type
              Vec<Type>,//TODO: add in effects
              Type,//Return type
-             HashMap<String, Value<'a>>,//Mapping of variable to value. This allows us to have higher order functions
+             HashMap<String, Value>,//Mapping of variable to value. This allows us to have higher order functions
              String,//Function body
     ),// TODO: add in function body
-    Promise(JoinHandle<Value<'a>>, Type,),//Return Value from a multi-threaded function
+    Promise(Arc<RwLock<JoinHandle<Value>>>, Type,),//Return Value from a multi-threaded function
     Algebraic {
         agb_type: AlgebraicType,
         types: Vec<Type>,
         name: String,
-        values: HashMap<Type, Value<'a>>,
+        values: HashMap<Type, Value>,
     },
     Alias {
         parent: Type,
         name: Type,
-        value: Box<Value<'a>>,
+        value: Box<Value>,
     },
-    Ref(&'a mut Value<'a>),
+    Ref(ValRef),
 }
 
-impl Clone for Value<'_> {
+unsafe impl Sync for ValRef {}
+unsafe impl Send for ValRef {}
+
+#[derive(Debug)]
+pub struct ValRef {
+    pub value: Rc<RefCell<Value>>,
+}
+
+impl ValRef {
+    pub fn new(value: Value) -> Self {
+        ValRef {
+            value: Rc::new(RefCell::new(value)),
+        }
+    }
+}
+
+impl Clone for Value {
     fn clone(&self) -> Self {
         match self {
             Value::Int(i) => Value::Int(*i),
@@ -255,7 +275,7 @@ impl Clone for Value<'_> {
             Value::Char(i) => Value::Char(*i),
             Value::Byte(i) => Value::Byte(*i),
             Value::List(i, t) => Value::List(i.clone(), t.clone()),
-            Value::Vector(i, t) => Value::Vector(i.clone(), t.clone()),
+            //Value::Vector(i, t) => Value::Vector(i.clone(), t.clone()),
             Value::Tuple(i) => Value::Tuple(i.clone()),
             Value::Function(a, b, c, d, e, f) => Value::Function(*a, b.clone(), c.clone(), d.clone(), e.clone(), f.clone()),
             Value::Promise(_, _) => panic!("Cannot clone a promise"),
@@ -263,21 +283,21 @@ impl Clone for Value<'_> {
             Value::Alias{parent, name, value} => Value::Alias{parent: parent.clone(), name: name.clone(), value: value.clone()},
             Value::Ref(_) => panic!("Cannot clone a reference"),
         }
-    }
+   }
 }
 
-impl <'a>Value<'a> {
-    pub fn create_promise(handle: JoinHandle<Value<'a>>, the_type: Type) -> Value<'a> {
+impl Value {
+    pub fn create_promise(handle: Arc<RwLock<JoinHandle<Value>>>, the_type: Type) -> Value {
         Value::Promise(handle, the_type)
     }
 
-    pub fn create_reference(&'a mut self) -> Value<'a> {
-        Value::Ref(self)
+    pub fn create_reference(self) -> Value {
+        Value::Ref(ValRef::new(self))
     }
 }
 
 
-impl <'a>TypeUtils for Value<'a> {
+impl TypeUtils for Value {
     fn get_type(&self) -> Type {
         match self {
             Value::Int(_) => Type::Single("Int".to_string()),
@@ -286,13 +306,13 @@ impl <'a>TypeUtils for Value<'a> {
             Value::Char(_) => Type::Single("Char".to_string()),
             Value::Byte(_) => Type::Single("Byte".to_string()),
             Value::List(_, t) => Type::TypeList{name: Box::new(Type::Single("List".to_string())), parameters: vec![t.get_type()]},
-            Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
+            //Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
             Value::Tuple(values) => Type::Tuple(values.iter().map(|v| v.get_type()).collect()),
             Value::Function(_,parameters, effects, return_type, _, _) => Type::Function{parameters: parameters.iter().map(|(_, t)| t.get_type()).collect(), effects: effects.clone(), return_type: Box::new(return_type.get_type())},
             Value::Promise(_, t) => Type::TypeList{name: Box::new(Type::Single("Promise".to_string())), parameters: vec![t.get_type()]},
             Value::Algebraic{agb_type, types, name, values} => Type::TypeList{ name: Box::new(Type::Single(name.clone())), parameters: types.iter().map(|t| t.get_type()).collect()},
             Value::Alias{parent, name, value} => name.get_type(),
-            Value::Ref(i) => Type::Ref(Box::new(i.get_type()))
+            Value::Ref(i) => Type::Ref(Box::new(i.value.borrow().get_type()))
         }
 
     }
@@ -306,7 +326,7 @@ impl <'a>TypeUtils for Value<'a> {
 
 }
 
-impl <'a>TypeUtils for &Value<'a> {
+impl TypeUtils for &Value {
     fn get_type(&self) -> Type {
         match self {
             Value::Int(_) => Type::Single("Int".to_string()),
@@ -315,13 +335,13 @@ impl <'a>TypeUtils for &Value<'a> {
             Value::Char(_) => Type::Single("Char".to_string()),
             Value::Byte(_) => Type::Single("Byte".to_string()),
             Value::List(_, t) => Type::TypeList{name: Box::new(Type::Single("List".to_string())), parameters: vec![t.get_type()]},
-            Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
+            //Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
             Value::Tuple(values) => Type::Tuple(values.iter().map(|v| v.get_type()).collect()),
             Value::Function(_,parameters, effects, return_type, _, _) => Type::Function{parameters: parameters.iter().map(|(_, t)| t.get_type()).collect(), effects: effects.clone(), return_type: Box::new(return_type.get_type())},
             Value::Promise(_, t) => Type::TypeList{name: Box::new(Type::Single("Promise".to_string())), parameters: vec![t.get_type()]},
             Value::Algebraic{agb_type, types, name, values} => Type::TypeList{ name: Box::new(Type::Single(name.clone())), parameters: types.iter().map(|t| t.get_type()).collect()},
             Value::Alias{parent, name, value} => name.get_type(),
-            Value::Ref(i) => Type::Ref(Box::new(i.get_type()))
+            Value::Ref(i) => Type::Ref(Box::new(i.value.borrow().get_type()))
         }
 
     }
@@ -336,16 +356,16 @@ impl <'a>TypeUtils for &Value<'a> {
 }
 
 
-pub type ValueImmu<'a> = Rc<Value<'a>>;
-pub type ValueMut<'a> = Rc<RefCell<Value<'a>>>;
+pub type ValueImmu = Rc<Value>;
+pub type ValueMut = Rc<RefCell<Value>>;
 
 #[derive(Debug, Clone)]
-pub enum ValuePtr<'a> {
-    Immu(Value<'a>),
-    Mut(Value<'a>),
+pub enum ValuePtr {
+    Immu(Value),
+    Mut(Value),
 }
 
-impl TypeUtils for ValuePtr<'_> {
+impl TypeUtils for ValuePtr {
     fn get_type(&self) -> Type {
         match self {
             ValuePtr::Immu(v) => v.get_type(),
@@ -360,7 +380,7 @@ impl TypeUtils for ValuePtr<'_> {
         }
     }
 }
-impl TypeUtils for &ValuePtr<'_> {
+impl TypeUtils for &ValuePtr {
     fn get_type(&self) -> Type {
         match self {
             ValuePtr::Immu(v) => v.get_type(),
@@ -376,16 +396,16 @@ impl TypeUtils for &ValuePtr<'_> {
     }
 }
 
-impl <'a>ValuePtr<'a> {
-    pub fn new_immu(value: Value<'a>) -> Self {
+impl ValuePtr {
+    pub fn new_immu(value: Value) -> Self {
         ValuePtr::Immu(value)
     }
-    pub fn new_mut(value: Value<'a>) -> Self {
+    pub fn new_mut(value: Value) -> Self {
         ValuePtr::Mut(value)
     }
 }
 
-impl<'a> ValueRef for ValuePtr<'a> {
+impl ValueRef for ValuePtr {
     fn get_value(&self) -> Value {
         match self {
             ValuePtr::Immu(v) => v.clone(),
@@ -393,7 +413,7 @@ impl<'a> ValueRef for ValuePtr<'a> {
         }
     }
 
-    fn get_value_mut(&'a mut self) -> Value<'a> {
+    fn get_value_mut(&mut self) -> Value {
         match self {
             ValuePtr::Immu(v) => panic!("Cannot get mutable reference to immutable value"),
             ValuePtr::Mut(v) => v.create_reference(),
@@ -405,7 +425,7 @@ impl<'a> ValueRef for ValuePtr<'a> {
 pub trait ValueRef {
     fn get_value(&self) -> Value;
 
-    fn get_value_mut(&self) -> Value;
+    fn get_value_mut(& mut self) -> Value;
 }
 
 
