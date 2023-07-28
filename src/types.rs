@@ -253,7 +253,7 @@ pub enum Value {
 unsafe impl Sync for ValRef {}
 unsafe impl Send for ValRef {}
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct ValRef {
     pub value: Rc<RefCell<Value>>,
 }
@@ -291,8 +291,11 @@ impl Value {
         Value::Promise(handle, the_type)
     }
 
-    pub fn create_reference(self) -> Value {
-        Value::Ref(ValRef::new(self))
+    pub fn create_reference(&self) -> Value {
+        match self {
+            Value::Ref(r) => Value::Ref(r.clone()),
+            _ => panic!("Cannot create a reference to a non-reference value"),
+        }
     }
 }
 
