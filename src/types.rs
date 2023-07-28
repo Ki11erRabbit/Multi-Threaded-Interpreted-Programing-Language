@@ -133,17 +133,15 @@ pub enum AlgebraicType {
     Product,
 }
 
-#[derive(Debug,)]
+#[derive(Debug,Clone)]
 pub enum Value<'a> {
     Int(i64),
     UInt(u64),
     Float(f64),
     Char(char),
     Byte(u8),
-    List(Box<Value<'a>>, Type),
-    HList(Vec<Value<'a>>),
+    List(Vec<Value<'a>>, Type),
     Vector(&'a [Value<'a>], Type),
-    HVector(Box<Value<'a>>),
     Tuple(Vec<Value<'a>>),
     Function(Vec<(String, Option<Type>)>,//Mapping of variable to type
              Vec<Type>,//TODO: add in effects
@@ -151,7 +149,7 @@ pub enum Value<'a> {
              HashMap<String, Value<'a>>,//Mapping of variable to value. This allows us to have higher order functions
              String,//Function body
     ),// TODO: add in function body
-    Promise(Mutex<Box<Value<'a>>>, Type),//Return Value from a multi-threaded function
+    Promise(&'a Mutex<Box<Value<'a>>>, Type),//Return Value from a multi-threaded function
     Algebraic {
         agb_type: AlgebraicType,
         types: Vec<Type>,
@@ -175,9 +173,7 @@ impl TypeUtils for Value<'_> {
             Value::Char(_) => Type::Single("Char".to_string()),
             Value::Byte(_) => Type::Single("Byte".to_string()),
             Value::List(_, t) => Type::TypeList{name: Box::new(Type::Single("List".to_string())), parameters: vec![t.get_type()]},
-            Value::HList(_) => Type::Single("HList".to_string()),
             Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
-            Value::HVector(_) => Type::Single("HVector".to_string()),
             Value::Tuple(values) => Type::Tuple(values.iter().map(|v| v.get_type()).collect()),
             Value::Function(parameters, effects, return_type, _, _) => Type::Function{parameters: parameters.iter().map(|(_, t)| t.get_type()).collect(), effects: effects.clone(), return_type: Box::new(return_type.get_type())},
             Value::Promise(_, t) => Type::TypeList{name: Box::new(Type::Single("Promise".to_string())), parameters: vec![t.get_type()]},
@@ -198,9 +194,7 @@ impl TypeUtils for &Value<'_> {
             Value::Char(_) => Type::Single("Char".to_string()),
             Value::Byte(_) => Type::Single("Byte".to_string()),
             Value::List(_, t) => Type::TypeList{name: Box::new(Type::Single("List".to_string())), parameters: vec![t.get_type()]},
-            Value::HList(_) => Type::Single("HList".to_string()),
             Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
-            Value::HVector(_) => Type::Single("HVector".to_string()),
             Value::Tuple(values) => Type::Tuple(values.iter().map(|v| v.get_type()).collect()),
             Value::Function(parameters, effects, return_type, _, _) => Type::Function{parameters: parameters.iter().map(|(_, t)| t.get_type()).collect(), effects: effects.clone(), return_type: Box::new(return_type.get_type())},
             Value::Promise(_, t) => Type::TypeList{name: Box::new(Type::Single("Promise".to_string())), parameters: vec![t.get_type()]},
@@ -213,15 +207,16 @@ impl TypeUtils for &Value<'_> {
 }
 
 
-pub type ValuePtr<'a> = Rc<Value<'a>>;
+pub type ValueImmu<'a> = Rc<Value<'a>>;
 pub type ValueMut<'a> = Rc<RefCell<Value<'a>>>;
 
-pub trait ValueUtils {
+pub trait ValueRef {
     fn get_type(&self) -> Type;
 
     fn get_value(&self) -> &Value;
 
-    fn pass_by_value(&self) -> &Self;
+    fn get_value_mut(&self) -> &mut Value;
 
-    fn pass_by_ref(&self) -> &Self;
 }
+
+
