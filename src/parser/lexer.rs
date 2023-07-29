@@ -8,6 +8,7 @@ use std::fmt;
 pub enum Token {
     WhiteSpace,
     Unit,
+    Reference,
     Number(String),
     String(String),
     Char(char),
@@ -60,6 +61,7 @@ pub enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Token::Reference => write!(f, "&"),
             Token::WhiteSpace => write!(f, " "),
             Token::Unit => write!(f, "()"),
             Token::Number(s) => write!(f, "{}", s),
@@ -303,7 +305,7 @@ pub fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
 
     let symbol = recursive(|sym| {
         choice((
-            just("()").to(Token::Unit).padded(),
+            //just("()").to(Token::Unit).padded(),
             just("[").to(Token::BracketLeft).padded(),
             just("]").to(Token::BracketRight).padded(),
             just("(").to(Token::ParenLeft),
@@ -746,8 +748,8 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
 
 
 
-    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:+-*/%&|^<>~!?.$#=");
-    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:+-*/%&|^<>~!?.$#=");
+    let cant_start_with = none_of::<char, &str,Simple<char>>("0123456789 \n\t\r'\"\\,()[]{}@;:");
+    let cant_contain = none_of(" \n\t\r'\"\\,()[]{}@;:");
 
     /*let cant_be = choice((
         just(":="),
@@ -777,8 +779,8 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         //just(">>=").map(|s| s.to_string()),
     ));
 
-    let valid_symbols = choice((one_of("+-*/%&|^<>~!?$#=").repeated().at_least(1),
-                                just('.').repeated().at_least(2))).padded();
+    /*let valid_symbols = choice((one_of("+-%&|^<>~!?$#=").repeated().at_least(1),
+                                just('.').repeated().at_least(2))).padded();*/
 
 
     let normal = cant_start_with
@@ -786,8 +788,8 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
         .map(|(c, s)| format!("{}{}", c, s.iter().collect::<String>()));
 
 
-    let symbol = valid_symbols
-        .map(|s| s.iter().collect::<String>());
+    /*let symbol = valid_symbols
+        .map(|s| s.iter().collect::<String>());*/
     /*let basic_identifier = 
         cant_be.not()
             .then(normal)
@@ -796,12 +798,10 @@ pub fn identifiers() -> impl Parser<char, Token, Error = Simple<char>> {
     let identifier = choice((
         special_identifiers,
         normal,
-        symbol,
+        //symbol,
     ))
     .map(|s| Token::Identifier(s));
         
-        
-    
 
     identifier
 }
@@ -1017,11 +1017,11 @@ pub fn tokenizer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     let token = choice((
         keywords().padded(),
         symbols().padded(),
+        identifiers().padded(),
         operators().padded(),
         //whitespace(),
         literals().padded(),
         comments().padded(),
-        identifiers().padded(),
     ));
 
     
@@ -1029,24 +1029,57 @@ pub fn tokenizer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     
 }
 
+
+
 pub fn lexer(input: &str) -> Result<Vec<Token>, Vec<Simple<char>>> {
     let result = tokenizer().parse(input)?;
 
     // This merges all whitespace tokens into one
     let mut new_result = Vec::new();
-    let mut found_whitespace = false;
     for token in result {
-        if found_whitespace && token == Token::WhiteSpace {
-            continue;
+
+        if token == Token::Identifier(":=".to_string()) {
+            new_result.push(Token::MutableAssignment);
         }
-        else if token == Token::WhiteSpace {
-            found_whitespace = true;
-            new_result.push(token);
+        else if token == Token::Identifier("::".to_string()) {
+            new_result.push(Token::Namespace);
+        }
+        else if token == Token::Identifier("->".to_string()) {
+            new_result.push(Token::FunctionReturn);
+        }
+        else if token == Token::Identifier("=>".to_string()) {
+            new_result.push(Token::MatchArm);
+        }
+        else if token == Token::Identifier(".".to_string()) {
+            new_result.push(Token::Period);
+        }
+        else if token == Token::Identifier("=".to_string()) {
+            new_result.push(Token::Assignment);
+        }
+        else if token == Token::Identifier("fn".to_string()) {
+            new_result.push(Token::Function);
         }
         else {
-            found_whitespace = false;
-            new_result.push(token);
+            match token {
+                Token::Identifier(s) => {
+                    if s.starts_with("&") && s.len() > 1 && s[1..].chars().all(|c| c.is_alphanumeric()) {
+                        new_result.push(Token::Reference);
+                        if s[1..] == *"fn" {
+                            new_result.push(Token::Function);
+                        }
+                        else {
+                            new_result.push(Token::Identifier(s[1..].to_string()));
+                        }
+                    }
+                    else {
+                        new_result.push(Token::Identifier(s));
+                    }
+                },
+                _ => new_result.push(token),
+            }
+            //new_result.push(token);
         }
+
         
     }
     Ok(new_result)
@@ -1059,7 +1092,7 @@ mod lexer_tests {
 
     #[test]
     fn test_assignment() {
-        let result = tokenizer().parse("a = 1");
+        let result = lexer("a = 1");
 
         if result.is_err() {
             eprintln!("{:?}", result);

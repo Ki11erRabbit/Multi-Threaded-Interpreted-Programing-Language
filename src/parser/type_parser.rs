@@ -7,78 +7,28 @@ use crate::types::Type;
 use std::ops::Range;
 use std::fmt;
 
-/*#[derive(Debug, PartialEq, Clone)]
-pub enum Type {
-    TypeList {
-        name: Box<Type>,
-        parameters: Vec<Type>,
-    },
-    Function {
-        parameters: Vec<Type>,
-        effects: Vec<Type>,
-        return_type: Box<Type>,
-    },
-    Single(String),
-    Tuple(Vec<Type>),
-    Unit,
-}
-
-
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Type::Single(name) => write!(f, "{}", name),
-            Type::Tuple(types) => {
-                let output = String::new();
-                let mut output = output + "(";
-                for t in types {
-                    output += &format!("{}, ", t);
-                }
-                output.pop();
-                output.pop();
-                output += ")";
-                write!(f, "{}", output)
-            },
-            Type::Function{parameters, effects, return_type} => {
-                let mut output = "fn(".to_string();
-
-                for p in parameters {
-                    output += &format!("{}, ", p);
-                }
-                output.pop();
-                output.pop();
-                output += ")";
-                for e in effects {
-                    output += &format!("{} ", e);
-                }
-                output += "-> ";
-                output += &format!("{}", return_type);
-                write!(f, "{}", output)
-            },
-            Type::TypeList{name, parameters} => {
-                let mut output = format!("({}", name);
-                for p in parameters {
-                    output += &format!(" {}", p);
-                }
-                output += ")";
-                write!(f, "{}", output)
-            },
-            Type::Unit => write!(f, "()"),
-            
-        }
-    }
-
-}*/
 
 pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
     recursive(|ev|
               choice((
+                  just(Token::Reference)
+                      .then(ev.clone())
+                      .map(|(_, inner_type)| Type::Ref(Box::new(inner_type)))
+                      .labelled("Reference Type Parser"),
+                  just(Token::Identifier("&".to_string()))
+                      .then(ev.clone())
+                      .map(|(_, inner_type)| Type::Ref(Box::new(inner_type)))
+                      .labelled("Reference Type Parser"),
                   filter_map(|span: Range<usize> , token| match token {
                       Token::Identifier(value) => Ok(Type::Single(value)),
                       Token::Unit => Ok(Type::Unit),
                       _ => Err(Simple::custom(span, format!("Expected identifier or unit, found {:?}", token))),
                   })
                       .labelled("Single or Unit Type Parser"),
+                  just(Token::ParenLeft)
+                      .then(just(Token::ParenRight))
+                      .map(|_| Type::Unit)
+                    .labelled("Empty Tuple Parser or Unit Parser"),
                   ev.clone()
                       .separated_by(just(Token::Comma))
                       .delimited_by(just(Token::ParenLeft), just(Token::ParenRight))
@@ -96,7 +46,7 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                           .then_ignore(just(Token::ParenRight))
                           .then(ev.clone()
                                 .separated_by(just(Token::Comma))
-                                .delimited_by(just(Token::Identifier("<".to_string())), just(Token::Identifier(">".to_string()))))
+                                .delimited_by(just(Token::ParenLeft), just(Token::ParenRight)))
                           .then_ignore(just(Token::FunctionReturn))
                           .then(ev.clone())
                           .map(|(((_, parameters), effects), return_type)| Type::Function{parameters, effects, return_type: Box::new(return_type)})
@@ -241,44 +191,44 @@ mod type_parser_tests {
 
     #[test]
     fn test_function_effect() {
-        let lexer_result = lexer("fn(Int) <exn> -> Int");
+        let lexer_result = lexer("fn(Int) (exn) -> Int");
 
         if lexer_result.is_err() {
             eprintln!("{:?}", lexer_result);
-            assert!(false, "Failed to lex function type: fn(Int) <exn> -> Int");
+            assert!(false, "Failed to lex function type: fn(Int) (exn) -> Int");
         }
 
         let result = type_parser().parse(lexer_result.unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
-            assert!(false, "Failed to parse function type: fn(Int) <exn> -> Int");
+            assert!(false, "Failed to parse function type: fn(Int) (exn) -> Int");
         }
 
         let result = result.unwrap();
 
-        assert_eq!(result, Type::Function { parameters: vec![Type::Single("Int".to_string())], effects: vec![Type::Single("exn".to_string())], return_type: Box::new(Type::Single("Int".to_string())) }, "Failed to parse function type: fn(Int) <exn> -> Int");
+        assert_eq!(result, Type::Function { parameters: vec![Type::Single("Int".to_string())], effects: vec![Type::Single("exn".to_string())], return_type: Box::new(Type::Single("Int".to_string())) }, "Failed to parse function type: fn(Int) (exn) -> Int");
     }
 
     #[test]
     fn test_function_many_effects() {
-        let lexer_result = lexer("fn(Int) <exn, io> -> Int");
+        let lexer_result = lexer("fn(Int) (exn, io) -> Int");
 
         if lexer_result.is_err() {
             eprintln!("{:?}", lexer_result);
-            assert!(false, "Failed to lex function type: fn(Int) <exn, io> -> Int");
+            assert!(false, "Failed to lex function type: fn(Int) (exn, io) -> Int");
         }
 
         let result = type_parser().parse(lexer_result.unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
-            assert!(false, "Failed to parse function type: fn(Int) <exn, io> -> Int");
+            assert!(false, "Failed to parse function type: fn(Int) (exn, io) -> Int");
         }
 
         let result = result.unwrap();
 
-        assert_eq!(result, Type::Function { parameters: vec![Type::Single("Int".to_string())], effects: vec![Type::Single("exn".to_string()), Type::Single("io".to_string())], return_type: Box::new(Type::Single("Int".to_string())) }, "Failed to parse function type: fn(Int) <exn, io> -> Int");
+        assert_eq!(result, Type::Function { parameters: vec![Type::Single("Int".to_string())], effects: vec![Type::Single("exn".to_string()), Type::Single("io".to_string())], return_type: Box::new(Type::Single("Int".to_string())) }, "Failed to parse function type: fn(Int) (exn, io) -> Int");
     }
 
     #[test]
@@ -493,14 +443,14 @@ mod type_parser_tests {
 
 pub fn type_statement_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
 
-    //just(Token::Colon).ignore_then(type_parser());
+    just(Token::Colon).ignore_then(type_parser())
 
-    let type_parser = choice((
+    /*let type_parser = choice((
         just(Token::Identifier("&".to_string())).ignore_then(type_parser()).map(|t| Type::Ref(Box::new(t))),
         type_parser(),
     ));
 
-    just(Token::Colon).ignore_then(type_parser)
+    just(Token::Colon).ignore_then(type_parser)*/
         
 
 
@@ -670,15 +620,17 @@ mod type_statement_parser {
             assert!(false, "Failed to lex reference type statement: x: &fn(Int) -> Int");
         }
 
-        let result = type_statement_parser().parse(lexer_result.unwrap());
+        let result = type_statement_parser().parse(lexer_result.clone().unwrap());
 
         if result.is_err() {
             eprintln!("{:?}", result);
+            eprintln!("{:?}", lexer_result);
             assert!(false, "Failed to parse reference type statement: x: &fn(Int) -> Int");
         }
 
         let result = result.unwrap();
 
+            eprintln!("{:?}", lexer_result);
         assert_eq!(result, Type::Ref(Box::new(Type::Function {
             parameters: vec![Type::Single("Int".to_string())],
             effects: vec![],

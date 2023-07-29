@@ -7,7 +7,7 @@ use crate::parser::type_parser::{type_parser, type_statement_parser};
 use crate::interpreter::Interpreter;
 use crate::types::{Type, Value, TypeUtils};
 
-
+#[derive(Debug, Clone, )]
 pub struct TypeClass {
     pub name: Type,
     pub functions: Vec<Result<Type,(String,Value)>>,
@@ -121,3 +121,95 @@ pub fn type_class_definition_parser() -> impl Parser<Token, TypeClass, Error = S
     type_class_parser
 }
 
+#[cfg(test)]
+mod type_class_dec_tests {
+    use super::*;
+
+
+    #[test]
+    fn test_functionless_type_class() {
+        let input = "class Test {}";
+        let tokens = lexer(input).unwrap();
+        let result = type_class_definition_parser().parse(tokens);
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse simple type class: {}", input);
+        }
+
+        let type_class = result.unwrap();
+
+        assert_eq!(type_class.name, Type::Single("Test".to_string()));
+    }
+
+    #[test]
+    fn test_typeclass_with_function() {
+        let input = "class Test { fn test() -> Int }";
+        let tokens = lexer(input).unwrap();
+        let result = type_class_definition_parser().parse(tokens);
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse simple type class: {}", input);
+        }
+
+        let type_class = result.unwrap();
+
+        assert_eq!(type_class.name, Type::Single("Test".to_string()));
+        assert_eq!(type_class.functions.len(), 1);
+    }
+
+    #[test]
+    fn test_typeclass_with_infix_function() {
+        let input = "class (Test a) { fn (+)(a, a) -> a }";
+        let tokens = lexer(input).unwrap();
+        let result = type_class_definition_parser().parse(tokens);
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse simple type class: {}", input);
+        }
+
+        let type_class = result.unwrap();
+
+        assert_eq!(type_class.name, Type::TypeList{ name: Box::new(Type::Single("Test".to_string())), parameters: vec![Type::Single("a".to_string())] });
+        assert_eq!(type_class.functions.len(), 1);
+    }
+
+    #[test]
+    fn test_eq_type_class() {
+        let input = "class (Eq a) { fn (==)(a, a) -> Bool\n fn (!=)(a, a) -> Bool }";
+        let tokens = lexer(input).unwrap();
+        let result = type_class_definition_parser().parse(tokens.clone());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            eprintln!("{:?}", tokens);
+            assert!(false, "Failed to parse simple type class: {}", input);
+        }
+
+        let type_class = result.unwrap();
+
+        assert_eq!(type_class.name, Type::TypeList{ name: Box::new(Type::Single("Eq".to_string())), parameters: vec![Type::Single("a".to_string())] });
+        assert_eq!(type_class.functions.len(), 2);
+    }
+
+    #[test]
+    fn test_ord_type_class() {
+        let input = "class (Ord a) { fn compare(a, a) -> Ordering\n fn (<)(a, a) -> Bool\n fn (<=)(a, a) -> Bool\n fn (>)(a, a) -> Bool\n fn (>=)(a, a) -> Bool }";
+        let tokens = lexer(input).unwrap();
+        let result = type_class_definition_parser().parse(tokens.clone());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            eprintln!("{:?}", tokens);
+            assert!(false, "Failed to parse simple type class: {}", input);
+        }
+
+        let type_class = result.unwrap();
+
+        assert_eq!(type_class.name, Type::TypeList{ name: Box::new(Type::Single("Ord".to_string())), parameters: vec![Type::Single("a".to_string())] });
+        assert_eq!(type_class.functions.len(), 5);
+    }
+
+}
