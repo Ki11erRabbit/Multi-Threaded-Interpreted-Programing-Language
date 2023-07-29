@@ -9,14 +9,14 @@ use crate::types::{Type, Value};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SumType {
-    name: Type,
-    variants: Vec<(String, Option<Type>)>,
+    pub name: Type,
+    pub variants: Vec<(String, Option<Type>)>,
 }
 
 
 
 
-fn sum_type_parser() -> impl Parser<Token, SumType, Error = Simple<Token>> {
+pub fn sum_type_parser() -> impl Parser<Token, SumType, Error = Simple<Token>> {
 
 
     let variant_parser =
@@ -143,8 +143,8 @@ mod sum_type_tests {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProductType {
-    name: Type,
-    fields: Vec<(String, Type)>,
+    pub name: Type,
+    pub fields: Vec<(String, Type)>,
 }
 
 
@@ -234,8 +234,9 @@ mod product_type_tests {
 }
 
 
+pub type TypeAlias = Type;
 
-pub fn type_alias_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
+pub fn type_alias_parser() -> impl Parser<Token, TypeAlias, Error = Simple<Token>> {
 
     let type_alias = just(Token::Type)
         .ignore_then(type_parser())

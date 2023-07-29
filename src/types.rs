@@ -116,7 +116,7 @@ impl fmt::Display for Type {
             },
             Type::Unit => write!(f, "()"),
             Type::Ref(t) => write!(f, "&{}", t),
-            Type::Alias(_, b) => write!(f, "{}", b),
+            Type::Alias(a, _) => write!(f, "{}", a),
             
         }
     }

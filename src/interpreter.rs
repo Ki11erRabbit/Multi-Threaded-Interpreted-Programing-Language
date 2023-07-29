@@ -1,5 +1,5 @@
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{RwLock, Arc, Mutex, TryLockResult, TryLockError};
 use std::thread;
 
@@ -125,6 +125,7 @@ pub struct Interpreter {
     type_class_symbol_table: Arc<RwLock<HashMap<String, HashMap<Type, Value>>>>,
     default_symbol_table: Arc<RwLock<HashMap<String, Value>>>,
     valid_typeclasses: Arc<RwLock<HashMap<Type, Vec<Type>>>>,
+    valid_types: Arc<RwLock<HashSet<Type>>>,
     local_global_variables: HashMap<String, Variable>,
     shared_global_variables: Arc<RwLock<HashMap<String, Variable>>>,
     mutable_global_variables: Arc<RwLock<HashMap<String, Arc<Mutex<Variable>>>>>,
@@ -138,6 +139,7 @@ impl Interpreter {
             type_class_symbol_table: Arc::new(RwLock::new(HashMap::new())),
             default_symbol_table: Arc::new(RwLock::new(HashMap::new())),
             valid_typeclasses: Arc::new(RwLock::new(HashMap::new())),
+            valid_types: Arc::new(RwLock::new(HashSet::new())),
             local_global_variables: HashMap::new(),
             shared_global_variables: Arc::new(RwLock::new(HashMap::new())),
             mutable_global_variables: Arc::new(RwLock::new(HashMap::new())),
@@ -146,6 +148,14 @@ impl Interpreter {
 }
 
 impl Interpreter {
+
+    pub fn get_type_classes(&self) -> Arc<RwLock<HashMap<Type, Vec<Type>>>> {
+        self.valid_typeclasses.clone()
+    }
+
+    pub fn get_valid_types(&self) -> Arc<RwLock<HashSet<Type>>> {
+        self.valid_types.clone()
+    }
 
     /// This function is how we add a new type class as well as their default implementation if there is one
     pub fn add_typeclass(&mut self, class: Type, functions: Vec<Result<Type,(String, Value)>>) {
@@ -178,6 +188,10 @@ impl Interpreter {
 
         }
     }
+
+    pub fn add_type(&mut self, the_type: Type) {
+        self.valid_types.write().expect("Interpreter was not able to be written to").insert(the_type);
+    }
     
     pub fn new_for_thread(& self) -> Interpreter {
         Interpreter {
@@ -185,6 +199,7 @@ impl Interpreter {
             type_class_symbol_table: self.type_class_symbol_table.clone(),
             default_symbol_table: self.default_symbol_table.clone(),
             valid_typeclasses: self.valid_typeclasses.clone(),
+            valid_types: self.valid_types.clone(),
             local_global_variables: HashMap::new(),
             shared_global_variables: self.shared_global_variables.clone(),
             mutable_global_variables: self.mutable_global_variables.clone(),

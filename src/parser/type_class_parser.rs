@@ -2,9 +2,8 @@ use chumsky::prelude::*;
 
 use std::collections::HashMap;
 
-use crate::parser::lexer::{Token, lexer};
-use crate::parser::type_parser::{type_parser, type_statement_parser};
-use crate::interpreter::Interpreter;
+use crate::parser::lexer::{Token};
+use crate::parser::type_parser::{type_parser};
 use crate::types::{Type, Value, TypeUtils};
 
 #[derive(Debug, Clone, )]
@@ -13,6 +12,7 @@ pub struct TypeClass {
     pub name: Type,
     pub functions: Vec<Result<Type,(String,Value)>>,
 }
+
 
 pub fn function_prototype_parser() -> impl Parser<Token, Result<Type,(String,Value)>, Error = Simple<Token>> {
     let infix_function_without_effects = just(Token::Function)
@@ -138,6 +138,7 @@ pub fn type_class_definition_parser() -> impl Parser<Token, TypeClass, Error = S
 #[cfg(test)]
 mod type_class_dec_tests {
     use super::*;
+    use crate::parser::lexer::{lexer};
 
 
     #[test]
