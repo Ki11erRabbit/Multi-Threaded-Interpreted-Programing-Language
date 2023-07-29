@@ -2,58 +2,86 @@
 use std::collections::HashMap;
 use std::sync::{RwLock, Arc, Mutex, TryLockResult, TryLockError};
 use std::thread;
-use std::thread::JoinHandle;
-use std::rc::Rc;
-use std::cell::RefCell;
 
-use crate::types::{ValuePtr, Type, Value,TypeUtils, ValueRef};
+use crate::types::{Type, Value,TypeUtils, ValRef};
 
 #[derive(Debug, Clone)]
 pub struct Variable {
     the_type: Option<Type>,
-    value: ValuePtr,
+    value: Option<Value>,
 }
 
 impl Variable {
-    pub fn new(value: ValuePtr) -> Variable {
+    pub fn new(value: Value) -> Variable {
         Variable {
             the_type: Some(value.get_type()),
-            value,
+            value: Some(value),
         }
     }
     
     pub fn is_mutable(&self) -> bool {
         match self.value {
-            ValuePtr::Mut(_) => true,
-            ValuePtr::Immu(_) => false,
+            Some(ref value) => value.is_mutable(),
+            None => false,
         }
     }
 }
 
 impl Variable {
-    pub fn set_value(&mut self, value: Value) {
-        if self.the_type.get_type() != value.get_type() {
+    pub fn assign_value(&mut self, r_value: Value) {
+        if self.the_type.get_type() != r_value.get_type() {
             panic!("Tried to assign a value of the wrong type to a variable");
         }
-
         match self.value {
-            ValuePtr::Mut(ref mut value_ptr) => {
-                *value_ptr = value;
+            Some(ref mut value) => {
+                if value.is_mutable() {
+                    value.set_value(r_value);
+                } else {
+                    panic!("Tried to assign a value to an immutable variable");
+                }
             }
-            ValuePtr::Immu(_) => {
-                self.value = ValuePtr::new_immu(value);
+            None => {
+                self.value = Some(r_value);
+            }
+        }
+        
+    }
+    pub fn set_value(&mut self, r_value: Value) {
+        if self.the_type.get_type() != r_value.get_type() {
+            panic!("Tried to set a value of the wrong type to a variable");
+        }
+        match self.value {
+            Some(ref mut value) => {
+                value.set_value(r_value);
+            }
+            None => {
+                self.value = Some(Value::new_ref(r_value));
             }
         }
     }
 
-    pub fn get_value(&self) -> ValuePtr {
-        match self.value {
-            ValuePtr::Mut(ref value_ptr) => {
-                ValuePtr::new_mut(value_ptr.clone())
+
+    pub fn get_immutable(&self) -> Value {
+        if let Some(ref value) = self.value {
+            if value.is_mutable() {
+                value.get_immutable().clone()
+            } else {
+                value.clone()
             }
-            ValuePtr::Immu(ref value_ptr) => {
-                ValuePtr::new_immu(value_ptr.clone())
+        } else {
+            panic!("Tried to get the value of a variable that doesn't have a value");
+        }
+    }
+
+    pub fn get_mutable(&self) -> Value {
+        if let Some(ref value) = self.value {
+            if value.is_mutable() {
+                value.clone()
+            } else {
+                panic!("Tried to get the mutable value of an immutable variable");
             }
+        } else {
+            panic!("Tried to get the value of a variable that doesn't have a value");
         }
     }
     
@@ -207,15 +235,15 @@ impl Interpreter {
         
     }
 
-    pub fn get_value(&self, name: &str, function_variables: &HashMap<String, ValuePtr>) -> Option<ValuePtr> {
+    pub fn get_value(&self, name: &str, function_variables: &HashMap<String, Value>) -> Option<Value> {
         if let Some(variable) = function_variables.get(name) {
             return Some(variable.clone());
         }
         if let Some(variable) = self.local_global_variables.get(name) {
-            return Some(variable.get_value());
+            return Some(variable.get_immutable());
         }
         if let Some(variable) = self.shared_global_variables.read().unwrap().get(name) {
-            return Some(variable.get_value());
+            return Some(variable.get_immutable());
         }
         if let Some(variable) = self.mutable_global_variables.read().unwrap().get(name) {
             let value;
@@ -233,13 +261,13 @@ impl Interpreter {
                     }
                 }
             }
-            return Some(value.get_value());
+            return Some(value.get_immutable());
         }
         None
         
     }
 
-    fn function_caller(& mut self, function_name: &str, function: Value, arguments: Vec<& mut ValuePtr>) -> Value {
+    fn function_caller(& mut self, function_name: &str, function: Value, arguments: Vec<Value>) -> Value {
         match function {
             Value::Function(threaded, args, effects, ret_type, variable_map, body) => {
                 let mut variable_map = variable_map;
@@ -251,10 +279,10 @@ impl Interpreter {
                     }
                     if the_type.is_ref() {
                         pass_by_ref = true;
-                        variable_map.insert(name.to_string(), arg.get_value_mut());
+                        variable_map.insert(name.to_string(), arg.clone());
                     }
                     else {
-                        variable_map.insert(name.to_string(), arg.get_value());
+                        variable_map.insert(name.to_string(), arg.get_immutable());
                     }
                 }
                 if threaded {
@@ -282,7 +310,7 @@ impl Interpreter {
         }
     }
 
-    pub fn call_function(&mut self, name: &str, arguments: Vec<&mut ValuePtr>, local_variables: HashMap<String, ValuePtr>) -> Value {
+    pub fn call_function(&mut self, name: &str, arguments: Vec<Value>, local_variables: HashMap<String, Value>) -> Value {
 
         let function = if let Some(function) = self.function_symbol_table.read().expect("Unable to read interpreter").get(name) {
             function.clone()
@@ -304,9 +332,9 @@ impl Interpreter {
 
     }
 
-    fn check_if_function(&self, name: &str, local_variables: &HashMap<String, ValuePtr>) -> Option<Value> {
+    fn check_if_function(&self, name: &str, local_variables: &HashMap<String, Value>) -> Option<Value> {
         if let Some(function) = local_variables.get(name) {
-            return Some(function.get_value().clone());
+            return Some(function.get_immutable().clone());
         }
         else {
             return None;

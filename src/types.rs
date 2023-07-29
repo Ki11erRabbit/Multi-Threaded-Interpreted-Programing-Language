@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc,RwLock};
 use std::fmt;
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut, Ref};
 use std::rc::Rc;
 use std::cmp::PartialEq;
 use std::thread::JoinHandle;
@@ -57,7 +57,7 @@ impl PartialEq for Type {
             (Type::Function{parameters: a, effects: b, return_type: c}, Type::Function{parameters: d, effects: e, return_type: f}) => a == d && b == e && c == f,
             (Type::TypeList{name: a, parameters: b}, Type::TypeList{name: c, parameters: d}) => a == c && b == d,
             (Type::Unit, Type::Unit) => true,
-            (Type::Ref(a), Type::Ref(b)) => *a == *b,
+            (Type::Ref(a), Type::Ref(b)) => a == b,
             (Type::Ref(a), b) => **a == *b,
             (a, Type::Ref(b)) => *a == **b,
             _ => false,
@@ -132,17 +132,20 @@ impl TypeUtils for Type {
     }
 
     fn is_ref(&self) -> bool {
-        self.is_reference()
+        match self {
+            Type::Ref(_) => true,
+            _ => false,
+        }
     }
 }
 
 impl TypeUtils for &Type {
     fn get_type(&self) -> Type {
-        (*self).clone()
+        self.get_type()
     }
 
     fn is_ref(&self) -> bool {
-        self.is_reference()
+        self.is_ref()
     }
 }
 
@@ -156,7 +159,7 @@ impl TypeUtils for Option<Type> {
 
     fn is_ref(&self) -> bool {
         match self {
-            Some(v) => v.is_reference(),
+            Some(v) => v.is_ref(),
             None => false,
         }
     }
@@ -164,17 +167,11 @@ impl TypeUtils for Option<Type> {
 
 impl TypeUtils for &Option<Type> {
     fn get_type(&self) -> Type {
-        match self {
-            Some(v) => v.get_type(),
-            None => Type::Single("Any".to_string()),
-        }
+        self.get_type()
     }
 
     fn is_ref(&self) -> bool {
-        match self {
-            Some(v) => v.is_reference(),
-            None => false,
-        }
+        self.is_ref()
     }
 }
 
@@ -188,7 +185,7 @@ impl TypeUtils for Option<Value> {
 
     fn is_ref(&self) -> bool {
         match self {
-            Some(v) => v.get_type().is_reference(),
+            Some(v) => v.is_ref(),
             None => false,
         }
     }
@@ -196,17 +193,11 @@ impl TypeUtils for Option<Value> {
 
 impl TypeUtils for &Option<Value> {
     fn get_type(&self) -> Type {
-        match self {
-            Some(v) => v.get_type(),
-            None => Type::Single("Any".to_string()),
-        }
+        self.get_type()
     }
 
     fn is_ref(&self) -> bool {
-        match self {
-            Some(v) => v.get_type().is_reference(),
-            None => false,
-        }
+        self.is_ref()
     }
 }
 
@@ -250,6 +241,46 @@ pub enum Value {
     Ref(ValRef),
 }
 
+impl Value {
+    pub fn is_mutable(&self) -> bool {
+        match self {
+            Value::Ref(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn set_value(&mut self, value: Value) {
+        match self {
+            Value::Ref(r) => {
+                *r.value.borrow_mut() = value;
+            },
+            _ => {},
+        }
+    }
+
+    pub fn new_ref(self) -> Self {
+        Value::Ref(ValRef::new(self))
+    }
+
+    pub fn get_immutable(&self) -> Self {
+        match self {
+            Value::Ref(r) => {
+                r.borrow().clone()
+            },
+            _ => self.clone(),
+        }
+    }
+
+    pub fn get_mutable(&self) -> Self {
+        match self {
+            Value::Ref(r) => {
+                self.clone()
+            },
+            _ => panic!("Cannot get mutable reference to immutable value"),
+        }
+    }
+}
+
 unsafe impl Sync for ValRef {}
 unsafe impl Send for ValRef {}
 
@@ -263,6 +294,14 @@ impl ValRef {
         ValRef {
             value: Rc::new(RefCell::new(value)),
         }
+    }
+
+    pub fn borrow(&self) -> Ref<Value> {
+        self.value.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> RefMut<Value> {
+        self.value.borrow_mut()
     }
 }
 
@@ -315,9 +354,8 @@ impl TypeUtils for Value {
             Value::Promise(_, t) => Type::TypeList{name: Box::new(Type::Single("Promise".to_string())), parameters: vec![t.get_type()]},
             Value::Algebraic{agb_type, types, name, values} => Type::TypeList{ name: Box::new(Type::Single(name.clone())), parameters: types.iter().map(|t| t.get_type()).collect()},
             Value::Alias{parent, name, value} => name.get_type(),
-            Value::Ref(i) => Type::Ref(Box::new(i.value.borrow().get_type()))
+            Value::Ref(i) => i.value.borrow().get_type(),
         }
-
     }
 
     fn is_ref(&self) -> bool {
@@ -326,40 +364,20 @@ impl TypeUtils for Value {
             _ => false,
         }
     }
-
 }
 
 impl TypeUtils for &Value {
     fn get_type(&self) -> Type {
-        match self {
-            Value::Int(_) => Type::Single("Int".to_string()),
-            Value::UInt(_) => Type::Single("UInt".to_string()),
-            Value::Float(_) => Type::Single("Float".to_string()),
-            Value::Char(_) => Type::Single("Char".to_string()),
-            Value::Byte(_) => Type::Single("Byte".to_string()),
-            Value::List(_, t) => Type::TypeList{name: Box::new(Type::Single("List".to_string())), parameters: vec![t.get_type()]},
-            //Value::Vector(_, t) => Type::TypeList{name: Box::new(Type::Single("Vector".to_string())), parameters: vec![t.get_type()]},
-            Value::Tuple(values) => Type::Tuple(values.iter().map(|v| v.get_type()).collect()),
-            Value::Function(_,parameters, effects, return_type, _, _) => Type::Function{parameters: parameters.iter().map(|(_, t)| t.get_type()).collect(), effects: effects.clone(), return_type: Box::new(return_type.get_type())},
-            Value::Promise(_, t) => Type::TypeList{name: Box::new(Type::Single("Promise".to_string())), parameters: vec![t.get_type()]},
-            Value::Algebraic{agb_type, types, name, values} => Type::TypeList{ name: Box::new(Type::Single(name.clone())), parameters: types.iter().map(|t| t.get_type()).collect()},
-            Value::Alias{parent, name, value} => name.get_type(),
-            Value::Ref(i) => Type::Ref(Box::new(i.value.borrow().get_type()))
-        }
-
+        self.get_type()
     }
 
     fn is_ref(&self) -> bool {
-        match self {
-            Value::Ref(_) => true,
-            _ => false,
-        }
+        self.is_ref()
     }
-
 }
 
 
-pub type ValueImmu = Rc<Value>;
+/*pub type ValueImmu = Rc<Value>;
 pub type ValueMut = Rc<RefCell<Value>>;
 
 #[derive(Debug, Clone)]
@@ -422,7 +440,7 @@ impl ValueRef for ValuePtr {
             ValuePtr::Mut(v) => v.create_reference(),
         }
     }
-}
+}*/
 
 
 pub trait ValueRef {
