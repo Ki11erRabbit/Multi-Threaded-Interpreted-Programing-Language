@@ -1064,6 +1064,7 @@ pub fn lexer(input: &str) -> Result<Vec<Token>, Vec<Simple<char>>> {
                 Token::Identifier(s) => {
                     if s.starts_with("&") && s.len() > 1 && s[1..].chars().all(|c| c.is_alphanumeric()) {
                         new_result.push(Token::Reference);
+                        //We should probably check if the identifier is other keywords here just in case
                         if s[1..] == *"fn" {
                             new_result.push(Token::Function);
                         }

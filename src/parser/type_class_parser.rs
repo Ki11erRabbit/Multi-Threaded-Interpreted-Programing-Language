@@ -9,6 +9,7 @@ use crate::types::{Type, Value, TypeUtils};
 
 #[derive(Debug, Clone, )]
 pub struct TypeClass {
+    pub parent: Option<Type>,
     pub name: Type,
     pub functions: Vec<Result<Type,(String,Value)>>,
 }
@@ -114,11 +115,24 @@ pub fn type_class_definition_parser() -> impl Parser<Token, TypeClass, Error = S
         .then(function_prototype_parser().repeated())
         .then_ignore(just(Token::CurlyRight))
         .map(|(type_name, functions)| {
-            TypeClass{ name:type_name, functions}
+            TypeClass{ parent: None, name:type_name, functions}
         });
 
+    let inheritance_parser = just(Token::Class)
+        .ignore_then(type_parser())
+        .then_ignore(just(Token::MatchArm))
+        .then(type_parser())
+        .then_ignore(just(Token::CurlyLeft))
+        .then(function_prototype_parser().repeated())
+        .then_ignore(just(Token::CurlyRight))
+        .map(|((parent, type_name), functions)| {
+            TypeClass{ parent: Some(parent), name:type_name, functions}
+        });
 
-    type_class_parser
+    choice((
+        type_class_parser,
+        inheritance_parser,
+    ))
 }
 
 #[cfg(test)]
@@ -196,7 +210,7 @@ mod type_class_dec_tests {
 
     #[test]
     fn test_ord_type_class() {
-        let input = "class (Ord a) { fn compare(a, a) -> Ordering\n fn (<)(a, a) -> Bool\n fn (<=)(a, a) -> Bool\n fn (>)(a, a) -> Bool\n fn (>=)(a, a) -> Bool }";
+        let input = "class (Eq a) => (Ord a) { fn compare(a, a) -> Ordering\n fn (<)(a, a) -> Bool\n fn (<=)(a, a) -> Bool\n fn (>)(a, a) -> Bool\n fn (>=)(a, a) -> Bool }";
         let tokens = lexer(input).unwrap();
         let result = type_class_definition_parser().parse(tokens.clone());
 
@@ -208,8 +222,10 @@ mod type_class_dec_tests {
 
         let type_class = result.unwrap();
 
+        assert_eq!(type_class.parent, Some(Type::TypeList{ name: Box::new(Type::Single("Eq".to_string())), parameters: vec![Type::Single("a".to_string())] }));
         assert_eq!(type_class.name, Type::TypeList{ name: Box::new(Type::Single("Ord".to_string())), parameters: vec![Type::Single("a".to_string())] });
         assert_eq!(type_class.functions.len(), 5);
     }
+
 
 }
