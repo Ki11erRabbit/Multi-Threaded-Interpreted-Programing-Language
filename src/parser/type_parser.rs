@@ -109,13 +109,15 @@ pub fn type_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
                           .then(ev.clone())
                           .map(|((_, parameters), return_type)| Type::Function{parameters, effects: vec![], return_type: Box::new(return_type)})
                           .labelled("Function without Effects Parser")
-                  ))
+                  )),
+                      
                       )))
 }
 
 #[cfg(test)]
 mod type_parser_tests {
     use super::*;
+    use crate::parser::lexer::lexer;
 
     #[test]
     fn test_single_type() {
@@ -485,18 +487,30 @@ mod type_parser_tests {
         }, "Failed to parse mixed type: fn((Int,(List Char))) -> (Float, Char)");
     }
 
+
 }
 
 
 pub fn type_statement_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
 
-    just(Token::Colon).ignore_then(type_parser())
+    //just(Token::Colon).ignore_then(type_parser());
+
+    let type_parser = choice((
+        just(Token::Identifier("&".to_string())).ignore_then(type_parser()).map(|t| Type::Ref(Box::new(t))),
+        type_parser(),
+    ));
+
+    just(Token::Colon).ignore_then(type_parser)
+        
+
+
 }
 
 
 #[cfg(test)]
 mod type_statement_parser {
     use super::*;
+    use crate::parser::lexer::lexer;
 
     #[test]
     fn test_type_statement() {
@@ -624,6 +638,100 @@ mod type_statement_parser {
                 Type::Single("Char".to_string())
             ]))
         }, "Failed to parse mixed type statement: x: fn((Int,(List Char))) -> (Float, Char)");
+    }
+
+    #[test]
+    fn test_reference_type() {
+        let lexer_result = lexer(": &Int");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex reference type statement: x: &Int");
+        }
+
+        let result = type_statement_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse reference type statement: x: &Int");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Ref(Box::new(Type::Single("Int".to_string()))), "Failed to parse reference type statement: x: &Int");
+    }
+
+    #[test]
+    fn test_reference_type_with_function() {
+        let lexer_result = lexer(": &fn(Int) -> Int");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex reference type statement: x: &fn(Int) -> Int");
+        }
+
+        let result = type_statement_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse reference type statement: x: &fn(Int) -> Int");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Ref(Box::new(Type::Function {
+            parameters: vec![Type::Single("Int".to_string())],
+            effects: vec![],
+            return_type: Box::new(Type::Single("Int".to_string()))
+        })), "Failed to parse reference type statement: x: &fn(Int) -> Int");
+    }
+
+    #[test]
+    fn test_reference_type_with_tuple() {
+        let lexer_result = lexer(": &(Int, Int)");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex reference type statement: x: &(Int, Int)");
+        }
+
+        let result = type_statement_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse reference type statement: x: &(Int, Int)");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Ref(Box::new(Type::Tuple(vec![
+            Type::Single("Int".to_string()),
+            Type::Single("Int".to_string())
+        ]))), "Failed to parse reference type statement: x: &(Int, Int)");
+    }
+
+    #[test]
+    fn test_reference_type_with_type_list() {
+        let lexer_result = lexer(": &(List Int)");
+
+        if lexer_result.is_err() {
+            eprintln!("{:?}", lexer_result);
+            assert!(false, "Failed to lex reference type statement: x: &(List Int)");
+        }
+
+        let result = type_statement_parser().parse(lexer_result.unwrap());
+
+        if result.is_err() {
+            eprintln!("{:?}", result);
+            assert!(false, "Failed to parse reference type statement: x: &(List Int)");
+        }
+
+        let result = result.unwrap();
+
+        assert_eq!(result, Type::Ref(Box::new(Type::TypeList {
+            name: Box::new(Type::Single("List".to_string())),
+            parameters: vec![Type::Single("Int".to_string())]
+        })), "Failed to parse reference type statement: x: &(List Int)");
     }
 
 }
