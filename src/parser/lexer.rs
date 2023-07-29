@@ -119,61 +119,59 @@ impl fmt::Display for Token {
 
 pub fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
 
-    let keyword = recursive(|kwd| {
-        
-        let class = text::keyword::<_, _, Simple<char>>("class").map(|_| Token::Class);
-        let instance = text::keyword::<_, _, Simple<char>>("instance").map(|_| Token::Instance);
-        let default = text::keyword::<_, _, Simple<char>>("default").map(|_| Token::Default);
-        let sum = text::keyword::<_, _, Simple<char>>("sum").map(|_| Token::Sum);
-        let product = text::keyword::<_, _, Simple<char>>("product").map(|_| Token::Product);
-        let type_ = text::keyword::<_, _, Simple<char>>("type").map(|_| Token::Type);
-        let function = text::keyword::<_, _, Simple<char>>("fn").map(|_| Token::Function);
-        let match_ = text::keyword::<_, _, Simple<char>>("match").map(|_| Token::Match);
-        let while_ = text::keyword::<_, _, Simple<char>>("while").map(|_| Token::While);
-        let elwhile = text::keyword::<_, _, Simple<char>>("elwhile").map(|_| Token::ElWhile);
-        let for_ = text::keyword::<_, _, Simple<char>>("for").map(|_| Token::For);
-        let loop_ = text::keyword::<_, _, Simple<char>>("loop").map(|_| Token::Loop);
-        let if_ = text::keyword::<_, _, Simple<char>>("if").map(|_| Token::If);
-        let elif = text::keyword::<_, _, Simple<char>>("elif").map(|_| Token::Elif);
-        let else_ = text::keyword::<_, _, Simple<char>>("else").map(|_| Token::Else);
-        let continue_ = text::keyword::<_, _, Simple<char>>("continue").map(|_| Token::Continue);
-        let break_ = text::keyword::<_, _, Simple<char>>("break").map(|_| Token::Break);
-        let in_ = text::keyword::<_, _, Simple<char>>("in").map(|_| Token::In);
-        let typeis = text::keyword::<_, _, Simple<char>>("typeis").map(|_| Token::Typeis);
-        let effect = text::keyword::<_, _, Simple<char>>("effect").map(|_| Token::Effect);
-        let with = text::keyword::<_, _, Simple<char>>("with").map(|_| Token::With);
-        let return_ = text::keyword::<_, _, Simple<char>>("return").map(|_| Token::Return);
-        let mod_ = text::keyword::<_, _, Simple<char>>("mod").map(|_| Token::Mod);
-        let import = text::keyword::<_, _, Simple<char>>("import").map(|_| Token::Import);
+    let class = text::keyword::<_, _, Simple<char>>("class").map(|_| Token::Class);
+    let instance = text::keyword::<_, _, Simple<char>>("instance").map(|_| Token::Instance);
+    let default = text::keyword::<_, _, Simple<char>>("default").map(|_| Token::Default);
+    let type_ = text::keyword::<_, _, Simple<char>>("type").map(|_| Token::Type);
+    let sum = text::keyword::<_, _, Simple<char>>("sum").padded()
+        .then(type_.clone().padded())
+        .map(|_| Token::Sum);
+    let product = text::keyword::<_, _, Simple<char>>("product")
+        .then(type_.clone().padded())
+        .map(|_| Token::Product);
+    let function = text::keyword::<_, _, Simple<char>>("fn").map(|_| Token::Function);
+    let match_ = text::keyword::<_, _, Simple<char>>("match").map(|_| Token::Match);
+    let while_ = text::keyword::<_, _, Simple<char>>("while").map(|_| Token::While);
+    let elwhile = text::keyword::<_, _, Simple<char>>("elwhile").map(|_| Token::ElWhile);
+    let for_ = text::keyword::<_, _, Simple<char>>("for").map(|_| Token::For);
+    let loop_ = text::keyword::<_, _, Simple<char>>("loop").map(|_| Token::Loop);
+    let if_ = text::keyword::<_, _, Simple<char>>("if").map(|_| Token::If);
+    let elif = text::keyword::<_, _, Simple<char>>("elif").map(|_| Token::Elif);
+    let else_ = text::keyword::<_, _, Simple<char>>("else").map(|_| Token::Else);
+    let continue_ = text::keyword::<_, _, Simple<char>>("continue").map(|_| Token::Continue);
+    let break_ = text::keyword::<_, _, Simple<char>>("break").map(|_| Token::Break);
+    let in_ = text::keyword::<_, _, Simple<char>>("in").map(|_| Token::In);
+    let typeis = text::keyword::<_, _, Simple<char>>("typeis").map(|_| Token::Typeis);
+    let effect = text::keyword::<_, _, Simple<char>>("effect").map(|_| Token::Effect);
+    let with = text::keyword::<_, _, Simple<char>>("with").map(|_| Token::With);
+    let return_ = text::keyword::<_, _, Simple<char>>("return").map(|_| Token::Return);
+    let mod_ = text::keyword::<_, _, Simple<char>>("mod").map(|_| Token::Mod);
+    let import = text::keyword::<_, _, Simple<char>>("import").map(|_| Token::Import);
 
-        choice((class
-           ,instance
-           ,default
-           ,sum
-           ,product
-           ,type_
-           ,function
-           ,match_
-           ,while_
-           ,elwhile
-           ,for_
-           ,loop_
-           ,if_
-           ,elif
-           ,else_
-           ,continue_
-           ,break_
-           ,in_
-           ,typeis
-           ,effect
-           ,with
-           ,return_
-           ,mod_
-           ,import))
-    });
-
-    
-    keyword
+    choice((class
+        ,instance
+        ,default
+        ,sum
+        ,product
+        ,type_
+        ,function
+        ,match_
+        ,while_
+        ,elwhile
+        ,for_
+        ,loop_
+        ,if_
+        ,elif
+        ,else_
+        ,continue_
+        ,break_
+        ,in_
+        ,typeis
+        ,effect
+        ,with
+        ,return_
+        ,mod_
+        ,import))
 }
 
 #[cfg(test)]
