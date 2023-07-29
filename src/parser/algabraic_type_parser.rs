@@ -139,3 +139,97 @@ mod sum_type_tests {
     }
 
 }
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductType {
+    name: Type,
+    fields: Vec<(String, Type)>,
+}
+
+
+pub fn product_type_parser() -> impl Parser<Token, ProductType, Error = Simple<Token>> {
+
+    let field_parser =
+        filter_map(|span, token| match token {
+            Token::Identifier(name) => Ok(name),
+            _ => Err(Simple::custom(span, "Expected identifier".to_string())),
+        })
+        .then_ignore(just(Token::Colon))
+        .then(type_parser())
+        .map(|(name, typ)| (name, typ))
+        .labelled("field");
+
+    let product_type = just(Token::Product)
+        .ignore_then(type_parser())
+        .then_ignore(just(Token::CurlyLeft))
+        .then(field_parser
+              .separated_by(just(Token::Comma)))
+        .then_ignore(just(Token::CurlyRight))
+        .map(|(name, fields)| ProductType { name, fields })
+        .labelled("product type");
+
+    product_type
+}
+
+
+#[cfg(test)]
+mod product_type_tests {
+    use super::*;
+    use crate::parser::lexer::lexer;
+
+    #[test]
+    fn product_type_test() {
+        let input = "product type a { a: Int, b: Int }";
+
+        let lexer_result = lexer(input);
+
+        if lexer_result.is_err() {
+            assert!(false,"Lexer error: {:?}", lexer_result.err());
+        }
+
+        let tokens = lexer_result.unwrap();
+
+        let result = product_type_parser().parse(tokens);
+
+        if result.is_err() {
+            assert!(false,"Parser error: {:?}", result.err());
+        }
+
+        let product_type = result.unwrap();
+
+        assert_eq!(product_type.name, Type::Single("a".to_string()), "Name is not correct");
+        assert_eq!(product_type.fields.len(), 2, "Number of fields is not correct");
+        assert_eq!(product_type.fields[0].0, "a".to_string(), "Field is not a");
+        assert_eq!(product_type.fields[1].0, "b".to_string(), "Field is not b");
+    }
+
+    #[test]
+    fn product_type_with_type_test() {
+        let input = "product type a { a: Int, b: (Maybe Int) }";
+
+        let lexer_result = lexer(input);
+
+        if lexer_result.is_err() {
+            assert!(false,"Lexer error: {:?}", lexer_result.err());
+        }
+
+        let tokens = lexer_result.unwrap();
+
+        let result = product_type_parser().parse(tokens);
+
+        if result.is_err() {
+            assert!(false,"Parser error: {:?}", result.err());
+        }
+
+        let product_type = result.unwrap();
+
+        assert_eq!(product_type.name, Type::Single("a".to_string()), "Name is not correct");
+        assert_eq!(product_type.fields.len(), 2, "Number of fields is not correct");
+        assert_eq!(product_type.fields[0].0, "a".to_string(), "Field is not a");
+        assert_eq!(product_type.fields[1].0, "b".to_string(), "Field is not b");
+        assert_eq!(product_type.fields[1].1, Type::TypeList{ name: Box::new(Type::Single("Maybe".to_string())), parameters: vec![Type::Single("Int".to_string())] }, "Field b does not hava a Maybe of Int");
+    }
+
+}
+
