@@ -360,6 +360,13 @@ impl Interpreter {
         unimplemented!("Interpretation of functions is not yet implemented");
     }
 
+    pub fn start_program(&mut self) {
+        self.function_symbol_table.read().expect("Unable to read interpreter").get("main").expect("No main function");
+        self.call_function("main", vec![], HashMap::new());
+
+    }
+        
+
     
 }
 
