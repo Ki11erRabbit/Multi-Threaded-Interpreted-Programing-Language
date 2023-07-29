@@ -3,7 +3,7 @@ use chumsky::prelude::*;
 use crate::parser::lexer::Token;
 use crate::parser::type_parser::{type_parser};
 
-use crate::types::Type;
+use crate::types::{Type, Value};
 
 
 
@@ -233,3 +233,70 @@ mod product_type_tests {
 
 }
 
+
+
+pub fn type_alias_parser() -> impl Parser<Token, Type, Error = Simple<Token>> {
+
+    let type_alias = just(Token::Type)
+        .ignore_then(type_parser())
+        .then_ignore(just(Token::Assignment))
+        .then(type_parser())
+        .map(|(name, typ)| Type::Alias(Box::new(name), Box::new(typ)))
+        .labelled("type alias");
+    
+    type_alias
+}
+
+
+#[cfg(test)]
+mod type_alias_test {
+    use super::*;
+    use crate::parser::lexer::lexer;
+
+    #[test]
+    fn type_alias_test() {
+        let input = "type a = Int";
+
+        let lexer_result = lexer(input);
+
+        if lexer_result.is_err() {
+            assert!(false,"Lexer error: {:?}", lexer_result.err());
+        }
+
+        let tokens = lexer_result.unwrap();
+
+        let result = type_alias_parser().parse(tokens);
+
+        if result.is_err() {
+            assert!(false,"Parser error: {:?}", result.err());
+        }
+
+        let type_alias = result.unwrap();
+
+        assert_eq!(type_alias, Type::Alias(Box::new(Type::Single("a".to_string())), Box::new(Type::Single("Int".to_string()))), "Type alias is not correct");
+    }
+
+    #[test]
+    fn test_string() {
+        let input = "type String = (List Char)";
+
+        let lexer_result = lexer(input);
+
+        if lexer_result.is_err() {
+            assert!(false,"Lexer error: {:?}", lexer_result.err());
+        }
+
+        let tokens = lexer_result.unwrap();
+
+        let result = type_alias_parser().parse(tokens);
+
+        if result.is_err() {
+            assert!(false,"Parser error: {:?}", result.err());
+        }
+
+        let type_alias = result.unwrap();
+
+        assert_eq!(type_alias, Type::Alias(Box::new(Type::Single("String".to_string())), Box::new(Type::TypeList{ name: Box::new(Type::Single("List".to_string())), parameters: vec![Type::Single("Char".to_string())] })), "Type alias is not correct");
+    }
+    
+}

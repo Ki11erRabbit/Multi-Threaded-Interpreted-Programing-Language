@@ -27,6 +27,7 @@ pub enum Type {
     Single(String),
     Tuple(Vec<Type>),
     Ref(Box<Type>),
+    Alias(Box<Type>, Box<Type>),
     Unit,
 }
 
@@ -60,6 +61,9 @@ impl PartialEq for Type {
             (Type::Ref(a), Type::Ref(b)) => a == b,
             (Type::Ref(a), b) => **a == *b,
             (a, Type::Ref(b)) => *a == **b,
+            (Type::Alias(a, b), Type::Alias(c, d)) => a == c && b == d,
+            (Type::Alias(a, b), c) => **a == *c,
+            (a, Type::Alias(b, c)) => *a == **b,
             _ => false,
         }
     }
@@ -112,6 +116,7 @@ impl fmt::Display for Type {
             },
             Type::Unit => write!(f, "()"),
             Type::Ref(t) => write!(f, "&{}", t),
+            Type::Alias(_, b) => write!(f, "{}", b),
             
         }
     }
@@ -141,11 +146,14 @@ impl TypeUtils for Type {
 
 impl TypeUtils for &Type {
     fn get_type(&self) -> Type {
-        self.get_type()
+        (*self).clone()
     }
 
     fn is_ref(&self) -> bool {
-        self.is_ref()
+        match self {
+            Type::Ref(_) => true,
+            _ => false,
+        }
     }
 }
 
