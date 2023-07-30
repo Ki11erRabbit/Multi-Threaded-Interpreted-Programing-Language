@@ -28,7 +28,7 @@ pub fn function_prototype_parser() -> impl Parser<Token, Result<Type,(String,Val
         .then_ignore(just(Token::FunctionReturn))
         .then(type_parser())
         .map(|(((_, name), args), return_type)| {
-            Value::Function(false, args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
+            Value::Function(vec![], args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
         });
 
 
@@ -48,7 +48,7 @@ pub fn function_prototype_parser() -> impl Parser<Token, Result<Type,(String,Val
         .then_ignore(just(Token::FunctionReturn))
         .then(type_parser())
         .map(|(((_, name), args), return_type)| {
-            Value::Function(false, args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
+            Value::Function(vec![], args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
         });
 
 
@@ -72,7 +72,7 @@ pub fn function_prototype_parser() -> impl Parser<Token, Result<Type,(String,Val
         .then_ignore(just(Token::FunctionReturn))
         .then(type_parser())
         .map(|(((_, name), args), return_type)| {
-            Value::Function(false, args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
+            Value::Function(vec![], args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
         });
 
 
@@ -90,7 +90,7 @@ pub fn function_prototype_parser() -> impl Parser<Token, Result<Type,(String,Val
         .then_ignore(just(Token::FunctionReturn))
         .then(type_parser())
         .map(|(((_, name), args), return_type)| {
-            Value::Function(false, args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
+            Value::Function(vec![], args.iter().map(|x| (String::new(), Some(x.clone()))).collect(), Vec::new(), return_type, HashMap::new(), String::new())
         });
 
     let normal_function = choice((

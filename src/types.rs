@@ -1,5 +1,5 @@
 
-
+use crate::parser::funtion_parser::Attribute;
 
 use std::collections::HashMap;
 use std::sync::{Arc,RwLock};
@@ -227,7 +227,7 @@ pub enum Value {
     List(Vec<Value>, Type),
     //Vector(Rc<RefCell<[Value]>>, Type),
     Tuple(Vec<Value>),
-    Function(bool,//Will We Spawn a new thread
+    Function(Vec<Attribute>,//Attributes
         Vec<(String, Option<Type>)>,//Mapping of variable to type
              Vec<Type>,//TODO: add in effects
              Type,//Return type
