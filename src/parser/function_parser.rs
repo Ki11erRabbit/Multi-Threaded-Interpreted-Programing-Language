@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attribute {
     OperatorOrder(usize),// for setting infix function precedence
@@ -24,7 +25,6 @@ pub enum Attribute {
     Control,             // For defining an effect function that can alter control flow (i.e. exceptions)
     Final,               // For defining what function to call when an effect escapes into main
 }
-
 
 
 pub fn attribute_parser() -> impl Parser<Token, Vec<Attribute>, Error = Simple<Token>> {
@@ -272,7 +272,7 @@ fn function_argument_parser() -> impl Parser<Token, (String, Option<Type>), Erro
 }
     
 
-pub fn infix_function_parser() -> impl Parser<Token, Result<Type, (String, Value)>, Error = Simple<Token>> {
+/*pub fn infix_function_parser() -> impl Parser<Token, Result<Type, (String, Value)>, Error = Simple<Token>> {
 
     let parser_without_effects = attribute_parser()
         .then_ignore(just(Token::Function))
@@ -295,7 +295,7 @@ pub fn infix_function_parser() -> impl Parser<Token, Result<Type, (String, Value
             let mut set_assoc = false;
             for attribute in attributes.iter() {
                 match attribute {
-                    Attribute::OperatorOrder(order) => add_operator_order(name.clone(), *order),
+                    Attribute::OperatorOrder(order) => add_operator_order(name.clone(), order),
                     Attribute::RightAssociative => {
                         set_assoc = true;
                         add_operator_associativity(name.clone(), Associativity::Right)
@@ -339,7 +339,7 @@ pub fn infix_function_parser() -> impl Parser<Token, Result<Type, (String, Value
             let mut set_assoc = false;
             for attribute in attributes.iter() {
                 match attribute {
-                    Attribute::OperatorOrder(order) => add_operator_order(name.clone(), *order),
+                    Attribute::OperatorOrder(order) => add_operator_order(name.clone(), order),
                     Attribute::RightAssociative => {
                         set_assoc = true;
                         add_operator_associativity(name.clone(), Associativity::Right)
@@ -361,7 +361,7 @@ pub fn infix_function_parser() -> impl Parser<Token, Result<Type, (String, Value
 
     choice((parser_with_effects, parser_without_effects))
 
-}
+}*/
 
 
 

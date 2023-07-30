@@ -1,6 +1,4 @@
 
-use crate::parser::function_parser::Attribute;
-
 use std::collections::HashMap;
 use std::sync::{Arc,RwLock};
 use std::fmt;
@@ -210,6 +208,21 @@ impl TypeUtils for &Option<Value> {
 }
 
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Attribute {
+    OperatorOrder(usize),// for setting infix function precedence
+    RightAssociative,    // for setting infix function associativity
+    LeftAssociative,     // for setting infix function associativity
+    Atomic,              // for setting atomicity of variables
+    ThreadLocal,         // for setting thread local variables. Not shared(Default)
+    ThreadShared,        // for setting thread shared variables. Shared
+    ThreadMutable,       // for setting thread mutable variables. Protected with Mutex
+    ThreadSpawn,         // for setting if a function will be spawned in a new thread
+    Minimal,             // for marking a type class function to be the only necessary function
+    Default,             // for marking a type class function to use the default implementation
+    Control,             // For defining an effect function that can alter control flow (i.e. exceptions)
+    Final,               // For defining what function to call when an effect escapes into main
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AlgebraicType {
@@ -219,6 +232,7 @@ pub enum AlgebraicType {
 
 #[derive(Debug)]
 pub enum Value {
+    None,
     Int(i64),
     UInt(u64),
     Float(f64),
@@ -313,9 +327,38 @@ impl ValRef {
     }
 }
 
+impl PartialEq for ValRef {
+    fn eq(&self, other: &Self) -> bool {
+        *self.value.borrow() == *other.value.borrow()
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::None, Value::None) => true,
+            (Value::Int(i), Value::Int(j)) => i == j,
+            (Value::UInt(i), Value::UInt(j)) => i == j,
+            (Value::Float(i), Value::Float(j)) => i == j,
+            (Value::Char(i), Value::Char(j)) => i == j,
+            (Value::Byte(i), Value::Byte(j)) => i == j,
+            (Value::List(i, t), Value::List(j, u)) => i == j && t == u,
+            //(Value::Vector(i, t), Value::Vector(j, u)) => i == j && t == u,
+            (Value::Tuple(i), Value::Tuple(j)) => i == j,
+            (Value::Function(a, b, c, d, e, f), Value::Function(g, h, i, j, k, l)) => a == g && b == h && c == i && d == j && e == k && f == l,
+            (Value::Promise(_, _), Value::Promise(_, _)) => panic!("Cannot compare promises"),
+            (Value::Algebraic { agb_type: a, types: b, name: c, values: d }, Value::Algebraic { agb_type: e, types: f, name: g, values: h }) => a == e && b == f && c == g && d == h,
+            (Value::Alias { parent: a, name: b, value: c }, Value::Alias { parent: d, name: e, value: f }) => a == d && b == e && c == f,
+            (Value::Ref(a), Value::Ref(b)) => *a == *b,
+            _ => false,
+        }
+    }
+}
+
 impl Clone for Value {
     fn clone(&self) -> Self {
         match self {
+            Value::None => Value::None,
             Value::Int(i) => Value::Int(*i),
             Value::UInt(i) => Value::UInt(*i),
             Value::Float(i) => Value::Float(*i),
@@ -324,7 +367,7 @@ impl Clone for Value {
             Value::List(i, t) => Value::List(i.clone(), t.clone()),
             //Value::Vector(i, t) => Value::Vector(i.clone(), t.clone()),
             Value::Tuple(i) => Value::Tuple(i.clone()),
-            Value::Function(a, b, c, d, e, f) => Value::Function(a.clone(), b.clone(), c.clone(), d.clone(), e.clone(), f.clone()),
+            Value::Function(a, b, c, d, e, f) => Value::Function(*a, b.clone(), c.clone(), d.clone(), e.clone(), f.clone()),
             Value::Promise(_, _) => panic!("Cannot clone a promise"),
             Value::Algebraic{agb_type, types, name, values} => Value::Algebraic{agb_type: agb_type.clone(), types: types.clone(), name: name.clone(), values: values.clone()},
             Value::Alias{parent, name, value} => Value::Alias{parent: parent.clone(), name: name.clone(), value: value.clone()},
@@ -350,6 +393,7 @@ impl Value {
 impl TypeUtils for Value {
     fn get_type(&self) -> Type {
         match self {
+            Value::None => Type::Single("()".to_string()),
             Value::Int(_) => Type::Single("Int".to_string()),
             Value::UInt(_) => Type::Single("UInt".to_string()),
             Value::Float(_) => Type::Single("Float".to_string()),
